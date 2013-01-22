@@ -1,5 +1,6 @@
 #include "common.h"
 #include "certpatrol.h"
+#include "certpatrol-gnutls.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -20,13 +21,13 @@
 /** Verify certificate chain of peer.
   */
 CertPatrolRC
-CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
+CertPatrol_GnuTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                           const char *host, size_t host_len,
                           const char *addr, size_t addr_len,
                           const char *proto, size_t proto_len,
                           uint16_t port)
 {
-    LOG_DEBUG(">> verify: %u, %s, %s, %s, %d\n", chain_len, host, addr, proto, port);
+    LOG_DEBUG(">> verify: %zu, %s, %s, %s, %d\n", chain_len, host, addr, proto, port);
 
     const char *name = host_len ? host : addr;
     size_t name_len = host_len ? host_len : addr_len;

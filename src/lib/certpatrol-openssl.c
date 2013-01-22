@@ -1,6 +1,6 @@
 #include "common.h"
 #include "certpatrol.h"
-#include "certpatrol-gnutls.h"
+#include "certpatrol-openssl.h"
 
 #include <openssl/ssl.h>
 
@@ -19,7 +19,7 @@ CertPatrol_OpenSSL_verify (const STACK_OF(X509) *chain,
         return ret;
 
     size_t ch_len = sk_X509_num(chain);
-    gnutls_datum_t *ch = malloc(ch_len * sizeof(gnutls_datum_t));
+    CertPatrolData *ch = malloc(ch_len * sizeof(CertPatrolData));
     int i, r;
 
     for (i = 0; i < ch_len; i++) {
@@ -28,8 +28,8 @@ CertPatrol_OpenSSL_verify (const STACK_OF(X509) *chain,
         ch[i].size = r >= 0 ? r : 0;
     }
 
-    ret = CertPatrol_GnuTLS_verify(ch, ch_len, host, host_len,
-                                   addr, addr_len, proto, proto_len, port);
+    ret = CertPatrol_verify(ch, ch_len, host, host_len,
+                            addr, addr_len, proto, proto_len, port);
 
     for (i = 0; i < ch_len; i++)
         OPENSSL_free(ch[i].data);

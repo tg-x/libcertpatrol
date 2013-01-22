@@ -166,6 +166,12 @@
 /* This is a Windows system */
 #cmakedefine _WIN32 1
 
+#cmakedefine HAVE_GNUTLS 1
+
+#cmakedefine HAVE_OPENSSL 1
+
+#cmakedefine HAVE_NSS 1
+
 /* Version string of package */
 #define VERSION "@VERSION@"
 

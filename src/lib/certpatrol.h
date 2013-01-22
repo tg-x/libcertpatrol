@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <gnutls/gnutls.h>
 
 typedef enum {
     CERTPATROL_ERROR = -1,
@@ -35,10 +36,7 @@ typedef enum {
     CERTPATROL_CMD_REJECT = 3,
 } CertPatrolCmdRC;
 
-typedef struct {
-    unsigned char *data;
-    unsigned int size;
-} CertPatrolData;
+typedef gnutls_datum_t CertPatrolData;
 
 #define CERTPATROL_DATA(_data, _size)                   \
     (CertPatrolData) {					\
@@ -70,9 +68,7 @@ CertPatrolCmdRC
 CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
                      uint16_t port, int64_t cert_id, bool wait);
 
-/**** DB functions ****/
-
-/** Find stored certificates for a peer,
+/** Get stored certificates of a peer.
  *
  * @param host		Hostname
  * @param host_len	Length of hostname.
@@ -122,5 +118,20 @@ CertPatrol_set_pin (const char *host, size_t host_len,
                     uint16_t port, int64_t cert_id,
                     const unsigned char *pin_pubkey, size_t pin_pubkey_len,
                     int64_t expiry);
+
+#include <certpatrol/certpatrol-gnutls.h>
+
+static inline
+CertPatrolRC
+CertPatrol_verify (const CertPatrolData *chain, size_t chain_len,
+                   const char *host, size_t host_len,
+                   const char *addr, size_t addr_len,
+                   const char *proto, size_t proto_len,
+                   uint16_t port)
+{
+    return CertPatrol_GnuTLS_verify((gnutls_datum_t *)chain, chain_len,
+                                    host, host_len, addr, addr_len,
+                                    proto, proto_len, port);
+}
 
 #endif // CERTPATROL_H

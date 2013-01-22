@@ -89,6 +89,10 @@ link_directories(
     ${GCR_LDFLAGS}
 )
 
+set(HAVE_GNUTLS ${GNUTLS_LIBRARIES})
+set(HAVE_OPENSSL ${OPENSSL_LIBRARIES})
+set(HAVE_NSS ${NSS_LIBRARIES})
+
 include(CheckIncludeFile)
 
 check_include_file("argz.h" HAVE_ARGZ_H)

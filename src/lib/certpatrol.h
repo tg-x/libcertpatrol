@@ -79,9 +79,8 @@ CertPatrol_get_peer_addr(int fd, int *proto,
                          int *port, char *addrstr);
 
 CertPatrolCmdRC
-CertPatrol_exec_cmd (const char *cmd, const char *event, const char *host,
-                     const char *proto, int port,
-                     CertPatrolInt64 cert_id, CertPatrolBool wait);
+CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
+                     int port, CertPatrolInt64 cert_id, CertPatrolBool wait);
 
 /**** DB functions ****/
 

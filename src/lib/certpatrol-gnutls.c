@@ -30,18 +30,18 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
     if (!chain_len || !name)
         return CERTPATROL_ERROR;
 
-    static int new_notify = -1, change_notify = -1, pin_level = 0;
+    static int new_notify = -1, change_notify = -1;
     static const char *new_cmd = NULL, *change_cmd = NULL;
-    char *buf;
+    static CertPatrolPinLevel pin_level = CERTPATROL_PIN_END_ENTITY;
     if (new_notify < 0) {
-        buf = getenv("CERTPATROL_NEW_NOTIFY");
-        new_notify = buf ? (buf[0] == '1' && buf[1] == '\0') : 0;
+        char *buf = getenv("CERTPATROL_NEW_NOTIFY");
+        new_notify = buf && buf[0] == '1' && buf[1] == '\0';
         new_cmd = getenv("CERTPATROL_NEW_CMD");
         if (new_cmd && new_cmd[0] == '\0')
             new_cmd = NULL;
 
         buf = getenv("CERTPATROL_CHANGE_NOTIFY");
-        change_notify = buf ? (buf[0] == '1' && buf[1] == '\0') : 0;
+        change_notify = buf && buf[0] == '1' && buf[1] == '\0';
         change_cmd = getenv("CERTPATROL_CHANGE_CMD");
         if (change_cmd && change_cmd[0] == '\0')
             change_cmd = NULL;
@@ -51,9 +51,9 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
             pin_level = atoi(buf);
     }
 
-    int r;
+    int r, notify;
+    const char *cmd = NULL;
     CertPatrolRC ret = CERTPATROL_ERROR;
-    CertPatrolCmdRC cmd_ret = CERTPATROL_CMD_ACCEPT;
     CertPatrolRecord *records = NULL, *rec = NULL;
     size_t records_len = 0;
     gnutls_pubkey_t pubkey;
@@ -87,11 +87,14 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
 
             CertPatrolData pubkey_der;
 #if GNUTLS_CHECK_VERSION(3, 1, 3)
-            r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER, &pubkey_der);
+            r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER,
+                                      (gnutls_datum_t *) &pubkey_der);
 #else
-            pubkey_der = CERTPATROL_DATA(gnutls_malloc(chain[i].size), chain[i].size);
+            pubkey_der = CERTPATROL_DATA(gnutls_malloc(chain[i].size),
+                                         chain[i].size);
             r = gnutls_pubkey_export(pubkey, GNUTLS_X509_FMT_DER,
-                                     pubkey_der.data, (size_t *) &(pubkey_der.size));
+                                     pubkey_der.data,
+                                     (size_t *) &(pubkey_der.size));
 #endif
             if (r != GNUTLS_E_SUCCESS) {
                 LOG_DEBUG(">>> error exporting pubkey #%d: %d\n", i, r);
@@ -99,13 +102,12 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
             }
 
             time_t expiration = 0;
-            /* TODO
+#if GNUTLS_CHECK_VERSION(3, 1, 6)
             time_t activation = 0;
             unsigned int critical;
-            gnutls_x509_crt_get_private_key_usage_period(cert, &activation,
+            gnutls_x509_crt_get_private_key_usage_period(crt, &activation,
                                                          &expiration, &critical);
-            */
-
+#endif
             if (0 >= CertPatrol_set_pin(name, name_len, proto, proto_len,
                                         port, cert_id, pubkey_der.data,
                                         pubkey_der.size, expiration)) {
@@ -133,26 +135,14 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
     switch (CertPatrol_get_certs(name, name_len, proto, proto_len, port,
                                  CERTPATROL_STATUS_ACTIVE, CERTPATROL_FALSE,
                                  &records, &records_len)) {
-    case CERTPATROL_DONE: // no results found
+    case CERTPATROL_DONE: // no active certs found for peer
         LOG_DEBUG(">>> new cert\n");
 
-        if (new_cmd) {
-            if (new_notify)
-                CertPatrol_exec_cmd(new_cmd, "new", host, proto,
-                                    port, cert_id, CERTPATROL_FALSE);
-            else
-                cmd_ret = CertPatrol_exec_cmd(new_cmd, "new", host, proto,
-                                              port, cert_id, CERTPATROL_TRUE);
-        }
-
-        if (cmd_ret == CERTPATROL_CMD_ACCEPT) {
-            CertPatrol_set_cert_active(name, name_len, proto, proto_len,
-                                       port, cert_id, CERTPATROL_PIN_EXCLUSIVE);
-            ret = CERTPATROL_OK;
-        }
+        cmd = new_cmd;
+        notify = new_notify;
         break;
 
-    case CERTPATROL_OK: // results found
+    case CERTPATROL_OK: // active cert(s) found for peer
         LOG_DEBUG(">>> cert found\n");
 
         // make a list of pubkeys present in the chain
@@ -177,11 +167,14 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
             }
 
 #if GNUTLS_CHECK_VERSION(3, 1, 3)
-            r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER, &pubkey_list[i]);
+            r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER,
+                                      (gnutls_datum_t *) &pubkey_list[i]);
 #else
-            pubkey_list[i] = CERTPATROL_DATA(malloc(chain[i].size), chain[i].size);
+            pubkey_list[i] = CERTPATROL_DATA(malloc(chain[i].size),
+                                             chain[i].size);
             r = gnutls_pubkey_export(pubkey, GNUTLS_X509_FMT_DER,
-                                     pubkey_list[i].data, (size_t *) &(pubkey_list[i].size));
+                                     pubkey_list[i].data,
+                                     (size_t *) &(pubkey_list[i].size));
 #endif
             if (r != GNUTLS_E_SUCCESS) {
                 LOG_DEBUG(">>> error exporting pubkey #%d: %d\n", i, r);
@@ -213,39 +206,40 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
             free(pubkey_list[i].data);
         free(pubkey_list);
 
-        if (ret != CERTPATROL_OK && change_cmd != NULL) {
-            if (change_notify)
-                CertPatrol_exec_cmd(change_cmd, "change", host, proto,
-                                    port, cert_id, CERTPATROL_FALSE);
-            else
-                cmd_ret = CertPatrol_exec_cmd(change_cmd, "change", host, proto,
-                                              port, cert_id, CERTPATROL_TRUE);
-        }
-
-        CertPatrolPinMode pin_mode = CERTPATROL_PIN_EXCLUSIVE;
-        switch (cmd_ret) {
-        case CERTPATROL_CMD_ACCEPT_ADD:
-            pin_mode = CERTPATROL_PIN_MULTIPLE;
-            // fall thru
-        case CERTPATROL_CMD_ACCEPT:
-            CertPatrol_set_cert_active(name, name_len, proto, proto_len, port,
-                                       cert_id, pin_mode);
-            // fall thru
-        case CERTPATROL_CMD_CONTINUE:
-            ret = CERTPATROL_OK;
-            break;
-        case CERTPATROL_CMD_REJECT:
-            CertPatrol_set_cert_status(name, name_len, proto, proto_len, port,
-                                       cert_id, CERTPATROL_STATUS_REJECTED);
-            // fall thru
-        default:
-            ret = CERTPATROL_ERROR;
-        }
-
+        cmd = change_cmd;
+        notify = change_notify;
         break;
 
     default:
         LOG_DEBUG(">>> get_certs error\n");
+        return CERTPATROL_ERROR;
+    }
+
+    CertPatrolCmdRC cmd_ret = CERTPATROL_CMD_ACCEPT;
+    CertPatrolPinMode pin_mode = CERTPATROL_PIN_EXCLUSIVE;
+
+    if (ret != CERTPATROL_OK && cmd != NULL) {
+        cmd_ret = CertPatrol_exec_cmd(cmd, host, proto, port,
+                                      cert_id, !notify);
+    }
+
+    switch (cmd_ret) {
+    case CERTPATROL_CMD_ACCEPT_ADD:
+        pin_mode = CERTPATROL_PIN_MULTIPLE;
+        // fall thru
+    case CERTPATROL_CMD_ACCEPT:
+        CertPatrol_set_cert_active(name, name_len, proto, proto_len, port,
+                                   cert_id, pin_mode);
+        // fall thru
+    case CERTPATROL_CMD_CONTINUE:
+        ret = CERTPATROL_OK;
+        break;
+    case CERTPATROL_CMD_REJECT:
+        CertPatrol_set_cert_status(name, name_len, proto, proto_len, port,
+                                   cert_id, CERTPATROL_STATUS_REJECTED);
+        // fall thru
+    default:
+        ret = CERTPATROL_ERROR;
     }
 
     return ret;

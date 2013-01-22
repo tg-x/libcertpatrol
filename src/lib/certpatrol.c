@@ -62,9 +62,8 @@ CertPatrol_get_peer_addr(int fd, int *proto,
 }
 
 CertPatrolCmdRC
-CertPatrol_exec_cmd (const char *cmd, const char *event, const char *host,
-                     const char *proto, int port,
-                     CertPatrolInt64 cert_id, CertPatrolBool wait)
+CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
+                     int port, CertPatrolInt64 cert_id, CertPatrolBool wait)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -75,9 +74,9 @@ CertPatrol_exec_cmd (const char *cmd, const char *event, const char *host,
         char id[21], prt[6];
         snprintf(prt, 6, "%d", port);
         snprintf(id, 21, "%lld", cert_id);
-        LOG_DEBUG("$ %s %s %s %s %s %s\n",
-                  cmd, event, host, proto, prt, id);
-        execlp(cmd, cmd, event, host, proto, prt, id, NULL);
+        LOG_DEBUG(">> exec_cmd: %s %s %s %s %s\n",
+                  cmd, host, proto, prt, id);
+        execlp(cmd, cmd, host, proto, prt, id, NULL);
         perror("exec");
         _exit(-1);
     }
@@ -85,7 +84,7 @@ CertPatrol_exec_cmd (const char *cmd, const char *event, const char *host,
     if (wait) {
         int ret;
         waitpid(pid, &ret, 0);
-        LOG_DEBUG(">>> certpatrol returned %d\n", ret);
+        LOG_DEBUG(">>> cmd returned %d\n", ret);
         return ret;
     } else {
         return CERTPATROL_CMD_ACCEPT;

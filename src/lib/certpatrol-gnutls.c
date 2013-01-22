@@ -2,6 +2,8 @@
 #include "certpatrol.h"
 
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -21,7 +23,8 @@ CertPatrolRC
 CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
                           const char *host, size_t host_len,
                           const char *addr, size_t addr_len,
-                          const char *proto, size_t proto_len, int port)
+                          const char *proto, size_t proto_len,
+                          uint16_t port)
 {
     LOG_DEBUG(">> verify: %u, %s, %s, %s, %d\n", chain_len, host, addr, proto, port);
 
@@ -58,7 +61,7 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
     size_t records_len = 0;
     gnutls_pubkey_t pubkey;
     gnutls_x509_crt_t crt;
-    CertPatrolInt64 cert_id = -1;
+    int64_t cert_id = -1;
     unsigned int i;
 
     switch (CertPatrol_add_cert(name, name_len, proto, proto_len, port,
@@ -133,7 +136,7 @@ CertPatrol_GnuTLS_verify (const CertPatrolData *chain, unsigned int chain_len,
     }
 
     switch (CertPatrol_get_certs(name, name_len, proto, proto_len, port,
-                                 CERTPATROL_STATUS_ACTIVE, CERTPATROL_FALSE,
+                                 CERTPATROL_STATUS_ACTIVE, false,
                                  &records, &records_len)) {
     case CERTPATROL_DONE: // no active certs found for peer
         LOG_DEBUG(">>> new cert\n");

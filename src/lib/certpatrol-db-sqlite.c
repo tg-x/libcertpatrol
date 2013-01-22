@@ -2,6 +2,8 @@
 #include "certpatrol.h"
 
 #include <stdlib.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -90,8 +92,8 @@ CertPatrol_db_close()
 
 CertPatrolRC
 CertPatrol_get_certs (const char *host, size_t host_len,
-                      const char *proto, size_t proto_len, int port,
-                      CertPatrolStatus status, CertPatrolBool wildcard,
+                      const char *proto, size_t proto_len, uint16_t port,
+                      CertPatrolStatus status, bool wildcard,
                       CertPatrolRecord **records, size_t *records_len)
 {
     if (!db) {
@@ -200,11 +202,10 @@ CertPatrol_get_certs (const char *host, size_t host_len,
 CertPatrolRC
 CertPatrol_add_cert (const char *host, size_t host_len,
                      const char *proto, size_t proto_len,
-                     int port, CertPatrolStatus status,
+                     uint16_t port, CertPatrolStatus status,
                      const CertPatrolData *chain, size_t chain_len,
                      const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                     CertPatrolInt64 pin_expiry,
-                     CertPatrolInt64 *cert_id)
+                     int64_t pin_expiry, int64_t *cert_id)
 {
     if (!db) {
         CertPatrol_db_open();
@@ -240,7 +241,7 @@ CertPatrol_add_cert (const char *host, size_t host_len,
     if (!stmt_rollback)
         sqlite3_prepare_v2(db, C2ARG("ROLLBACK"), &stmt_rollback, NULL);
 
-    CertPatrolInt64 ret = CERTPATROL_ERROR;
+    CertPatrolRC ret = CERTPATROL_ERROR;
     char *ca_chain = NULL;
     size_t i, ca_chain_len = 0;
     *cert_id = -1;
@@ -305,7 +306,7 @@ CertPatrol_add_cert (const char *host, size_t host_len,
         case SQLITE_DONE:
             if (cert_id)
                 *cert_id = sqlite3_last_insert_rowid(db);
-            LOG_DEBUG(">>> cert_id = %lld\n", *cert_id);
+            LOG_DEBUG(">>> cert_id = %" PRId64 "\n", *cert_id);
             break;
         case SQLITE_BUSY:
             // TODO retry
@@ -368,7 +369,7 @@ add_cert_end:
 CertPatrolRC
 CertPatrol_set_cert_status (const char *host, size_t host_len,
                             const char *proto, size_t proto_len,
-                            int port, CertPatrolInt64 cert_id, int status)
+                            uint16_t port, int64_t cert_id, int status)
 {
     if (!db) {
         CertPatrol_db_open();
@@ -415,7 +416,7 @@ CertPatrol_set_cert_status (const char *host, size_t host_len,
 CertPatrolRC
 CertPatrol_set_cert_active (const char *host, size_t host_len,
                             const char *proto, size_t proto_len,
-                            int port, CertPatrolInt64 cert_id,
+                            uint16_t port, int64_t cert_id,
                             CertPatrolPinMode pin_mode)
 {
     if (!db) {
@@ -471,7 +472,7 @@ CertPatrol_set_cert_active (const char *host, size_t host_len,
 int
 CertPatrol_set_cert_seen (const char *host, size_t host_len,
                           const char *proto, size_t proto_len,
-                          int port, CertPatrolInt64 cert_id)
+                          uint16_t port, int64_t cert_id)
 {
     if (!db)
         CertPatrol_db_open();
@@ -517,9 +518,9 @@ CertPatrol_set_cert_seen (const char *host, size_t host_len,
 CertPatrolRC
 CertPatrol_set_pin (const char *host, size_t host_len,
                     const char *proto, size_t proto_len,
-                    int port, CertPatrolInt64 cert_id,
+                    uint16_t port, int64_t cert_id,
                     const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                    CertPatrolInt64 pin_expiry)
+                    int64_t pin_expiry)
 {
     if (!db) {
         CertPatrol_db_open();

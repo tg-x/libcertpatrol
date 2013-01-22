@@ -2,6 +2,9 @@
 #include "certpatrol.h"
 
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -13,7 +16,8 @@
 CertPatrolRC
 CertPatrol_get_peer_addr(int fd, int *proto,
                          char *protoname, size_t protonamelen,
-                         int *port, char *addrstr) {
+                         uint16_t *port, char *addrstr)
+{
     socklen_t length = sizeof(int);
 
 #if defined(SO_PROTOCOL) || defined(SO_PROTOTYPE)
@@ -63,7 +67,7 @@ CertPatrol_get_peer_addr(int fd, int *proto,
 
 CertPatrolCmdRC
 CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
-                     int port, CertPatrolInt64 cert_id, CertPatrolBool wait)
+                     uint16_t port, int64_t cert_id, bool wait)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -72,8 +76,8 @@ CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
     }
     if (pid == 0) {
         char id[21], prt[6];
-        snprintf(prt, 6, "%d", port);
-        snprintf(id, 21, "%lld", cert_id);
+        snprintf(prt, 6, "%u", port);
+        snprintf(id, 21, "%" PRId64, cert_id);
         LOG_DEBUG(">> exec_cmd: %s %s %s %s %s\n",
                   cmd, host, proto, prt, id);
         execlp(cmd, cmd, host, proto, prt, id, NULL);

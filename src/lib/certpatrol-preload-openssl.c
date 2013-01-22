@@ -36,7 +36,8 @@ SSL_get_verify_result (const SSL *ssl)
     hostname = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
 #endif
 
-    int proto, port;
+    int proto;
+    uint16_t port;
     #define PROTONAMELEN 32
     char protoname[PROTONAMELEN];
     char addr[INET6_ADDRSTRLEN];

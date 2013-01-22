@@ -31,6 +31,9 @@ typedef union {
     uint32_t num;
 } extension_priv_data_t;
 
+int _gnutls_ext_get_session_data (gnutls_session_t session,
+                                  uint16_t type, extension_priv_data_t *);
+
 /** Verify the peer's certificate.
  *
  * Store the status in the status variable as bitwise or'd
@@ -56,7 +59,8 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
 
     int fd = (int)(intptr_t) gnutls_transport_get_ptr(session);
 
-    int proto, port;
+    int proto;
+    uint16_t port;
     #define PROTONAMELEN 32
     char protoname[PROTONAMELEN] = "";
     char addr[INET6_ADDRSTRLEN] = "";
@@ -124,7 +128,8 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
 
     int fd = (int)(intptr_t) gnutls_transport_get_ptr(session);
 
-    int proto, port;
+    int proto;
+    uint16_t port;
     #define PROTONAMELEN 32
     char protoname[PROTONAMELEN] = "";
     char addr[INET6_ADDRSTRLEN] = "";

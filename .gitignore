@@ -10,6 +10,7 @@
 *orig
 *.cmake
 *.so
+bin
 doc/html
 doc/latex
 doc/man
@@ -18,3 +19,4 @@ Makefile
 CMakeCache.txt
 Doxyfile
 config.h
+install_manifest.txt

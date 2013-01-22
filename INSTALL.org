@@ -1,0 +1,26 @@
+#+TITLE: Certificate Patrol
+
+* Prerequisites
+
+- GnuTLS
+- OpenSSL (optional)
+- NSS (optional)
+- gcr-3
+
+* Compiling
+
+Run cmake to use the default options:
+: cmake .
+
+Or use ccmake for a text-based configuration:
+: ccmake .
+
+Or use cmake-gui for GUI configuration:
+: cmake-gui .
+
+Add the following option for a debug build:
+: cmake -DCMAKE_BUILD_TYPE=Debug .
+
+Compile and install:
+: make
+: sudo make install

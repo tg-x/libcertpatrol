@@ -5,19 +5,13 @@ set(VERSION_MINOR 1)
 set(VERSION_PATCH 0)
 set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
-IF(NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
     "Choose the type of build, options are: None Debug Release RelWithDebInfo." FORCE)
-ENDIF(NOT CMAKE_BUILD_TYPE)
-
-INCLUDE(FindPkgConfig)
-
-pkg_check_modules(GNUTLS gnutls REQUIRED)
-pkg_check_modules(OPENSSL openssl)
-pkg_check_modules(NSS nss)
+endif()
 
 set(CMAKE_C_FLAGS "-Wall" CACHE STRING
-    "Common C flags")
+    "Common C flags" FORCE)
 set(CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -DDEBUG" CACHE STRING
     "C flags for debug build" FORCE)
 set(CMAKE_C_FLAGS_RELWITHDEBINFO "-ggdb -O2" CACHE STRING
@@ -25,13 +19,75 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "-ggdb -O2" CACHE STRING
 set(CMAKE_C_FLAGS_RELEASE "-O2" CACHE STRING
     "C flags for release" FORCE)
 
+include(FindPkgConfig)
+pkg_check_modules(PKG_GNUTLS gnutls REQUIRED)
+pkg_check_modules(PKG_OPENSSL openssl)
+pkg_check_modules(PKG_NSS nss)
+pkg_check_modules(PKG_SQLITE sqlite3 REQUIRED)
+pkg_check_modules(PKG_GTK gtk+-3.0 REQUIRED)
+pkg_check_modules(PKG_GCR gcr-3 REQUIRED)
+
+set(GNUTLS_INCLUDE_DIRS ${PKG_GNUTLS_INCLUDE_DIRS} CACHE STRING
+    "GnuTLS include dirs")
+set(GNUTLS_LIBDIR ${PKG_GNUTLS_LIBDIR} CACHE STRING
+    "GnuTLS lib dir")
+set(GNUTLS_LIBRARIES ${PKG_GNUTLS_LIBRARIES} CACHE STRING
+    "GnuTLS libraries")
+
+set(OPENSSL_INCLUDE_DIRS ${PKG_OPENSSL_INCLUDE_DIRS} CACHE STRING
+    "OpenSSL include dirs")
+set(OPENSSL_LIBDIR ${PKG_OPENSSL_LIBDIR} CACHE STRING
+    "OpenSSL lib dir")
+set(OPENSSL_LIBRARIES ${PKG_OPENSSL_LIBRARIES} CACHE STRING
+    "OpenSSL libraries")
+
+set(NSS_INCLUDE_DIRS ${PKG_NSS_INCLUDE_DIRS} CACHE STRING
+    "NSS include dirs")
+set(NSS_LIBDIR ${PKG_NSS_LIBDIR} CACHE STRING
+    "NSS lib dir")
+set(NSS_LIBRARIES ${PKG_NSS_LIBRARIES} CACHE STRING
+    "NSS libraries")
+
+set(SQLITE_INCLUDE_DIRS ${PKG_SQLITE_INCLUDE_DIRS} CACHE STRING
+    "SQLite include dirs")
+set(SQLITE_LIBDIR ${PKG_SQLITE_LIBDIR} CACHE STRING
+    "SQLite lib dir")
+set(SQLITE_LIBRARIES ${PKG_SQLITE_LIBRARIES} CACHE STRING
+    "SQLite libraries")
+
+set(GTK_INCLUDE_DIRS ${PKG_GTK_INCLUDE_DIRS} CACHE STRING
+    "GTK include dirs")
+set(GTK_LIBDIR ${PKG_GTK_LIBDIR} CACHE STRING
+    "GTK lib dir")
+set(GTK_LIBRARIES ${PKG_GTK_LIBRARIES} CACHE STRING
+    "GTK libraries")
+
+set(GCR_INCLUDE_DIRS ${PKG_GCR_INCLUDE_DIRS} CACHE STRING
+    "Gcr include dirs")
+set(GCR_LIBDIR ${PKG_GCR_LIBDIR} CACHE STRING
+    "Gcr lib dir")
+set(GCR_LIBRARIES ${PKG_GCR_LIBRARIES} CACHE STRING
+    "Gcr libraries")
+
 include_directories(
-    "${CMAKE_SOURCE_DIR}/include"
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
     ${GNUTLS_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
     ${NSS_INCLUDE_DIRS}
+    ${SQLITE_INCLUDE_DIRS}
+    ${GTK_INCLUDE_DIRS}
+    ${GCR_INCLUDE_DIRS}
 )
-link_directories("${CMAKE_SOURCE_DIR}/lib")
+link_directories(
+    ${CMAKE_SOURCE_DIR}/lib
+    ${GNUTLS_LDFLAGS}
+    ${OPENSSL_LDFLAGS}
+    ${NSS_LDFLAGS}
+    ${SQLITE_LDFLAGS}
+    ${GTK_LDFLAGS}
+    ${GCR_LDFLAGS}
+)
 
 include(CheckIncludeFile)
 
@@ -91,7 +147,7 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
 set(CMAKE_BINARY_DIR .CMakeFiles)
 
-#configure_file(config.h.in config.h)
+configure_file(config.h.in config.h)
 
 include(FindDoxygen)
 add_custom_target(doc ${DOXYGEN_EXECUTABLE})

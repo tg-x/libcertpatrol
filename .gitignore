@@ -9,7 +9,7 @@
 *diff
 *orig
 *.cmake
-lib
+*.so
 doc/html
 doc/latex
 doc/man

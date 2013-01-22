@@ -5,7 +5,7 @@ add_library(certpatrol SHARED
   certpatrol-db-sqlite.c
 )
 target_link_libraries(certpatrol
-    -lsqlite3
+    ${SQLITE_LIBRARIES}
 )
 install(TARGETS certpatrol DESTINATION lib)
 
@@ -14,9 +14,8 @@ install(TARGETS certpatrol DESTINATION lib)
 add_library(certpatrol-gnutls SHARED
   certpatrol-gnutls.c
 )
-add_dependencies(certpatrol-gnutls certpatrol)
 target_link_libraries(certpatrol-gnutls
-    -lcertpatrol
+    certpatrol
     ${GNUTLS_LIBRARIES}
 )
 install(TARGETS certpatrol-gnutls DESTINATION lib)
@@ -27,10 +26,9 @@ if(OPENSSL_LIBRARIES)
     add_library(certpatrol-openssl SHARED
         certpatrol-openssl.c
     )
-    add_dependencies(certpatrol-openssl certpatrol-gnutls)
     target_link_libraries(certpatrol-openssl
-        -lcertpatrol
-        -lcertpatrol-gnutls
+        certpatrol
+        certpatrol-gnutls
         ${OPENSSL_LIBRARIES}
     )
     install(TARGETS certpatrol-openssl DESTINATION lib)
@@ -42,10 +40,9 @@ if(NSS_LIBRARIES)
     add_library(certpatrol-nss SHARED
         certpatrol-nss.c
     )
-    add_dependencies(certpatrol-nss certpatrol-gnutls)
     target_link_libraries(certpatrol-nss
-        -lcertpatrol
-        -lcertpatrol-gnutls
+        certpatrol
+        certpatrol-gnutls
         ${NSS_LIBRARIES}
     )
     install(TARGETS certpatrol-nss DESTINATION lib)
@@ -64,8 +61,8 @@ if(NSS_LIBRARIES)
 endif()
 
 add_library(certpatrol-preload SHARED ${SRC})
-add_dependencies(certpatrol-gnutls certpatrol)
-target_link_libraries(certpatrol-gnutls
-    -lcertpatrol
+target_link_libraries(certpatrol-preload
+    certpatrol
+    certpatrol-gnutls
 )
 install(TARGETS certpatrol-preload DESTINATION lib)

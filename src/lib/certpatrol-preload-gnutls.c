@@ -10,14 +10,16 @@
 
 #define LIBGNUTLS "libgnutls.so"
 
+#define PROTONAMELEN 32
+
 #define GNUTLS_EXTENSION_SERVER_NAME 0
 #define MAX_SERVER_NAME_SIZE 128
 #define MAX_SERVER_NAME_EXTENSIONS 3
 
 typedef struct {
-  uint8_t name[MAX_SERVER_NAME_SIZE];
-  unsigned name_length;
-  gnutls_server_name_type_t type;
+    uint8_t name[MAX_SERVER_NAME_SIZE];
+    unsigned name_length;
+    gnutls_server_name_type_t type;
 } server_name_st;
 
 typedef struct {
@@ -61,24 +63,23 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
 
     int proto;
     uint16_t port;
-    #define PROTONAMELEN 32
     char protoname[PROTONAMELEN] = "";
     char addr[INET6_ADDRSTRLEN] = "";
-    if (CERTPATROL_OK != CertPatrol_get_peer_addr(fd, &proto, protoname,
-                                                  PROTONAMELEN, &port, addr))
+    if (PATROL_OK != PATROL_get_peer_addr(fd, &proto, protoname,
+                                          PROTONAMELEN, &port, addr))
         return GNUTLS_E_CERTIFICATE_ERROR;
 
     unsigned int chain_len;
     const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
                                                                &chain_len);
 
-    int cp_ret = CertPatrol_GnuTLS_verify(chain, chain_len,
-                                          hostname, strlen(hostname),
-                                          addr, strlen(addr),
-                                          protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> CP result = %d\n", cp_ret);
+    int pret = PATROL_GnuTLS_verify(chain, chain_len,
+                                    hostname, strlen(hostname),
+                                    addr, strlen(addr),
+                                    protoname, strlen(protoname), port);
+    LOG_DEBUG(">>> patrol result = %d\n", pret);
 
-    return cp_ret == CERTPATROL_OK
+    return pret == PATROL_OK
         ? GNUTLS_E_SUCCESS
         : GNUTLS_E_CERTIFICATE_ERROR;
 }
@@ -130,24 +131,23 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
 
     int proto;
     uint16_t port;
-    #define PROTONAMELEN 32
     char protoname[PROTONAMELEN] = "";
     char addr[INET6_ADDRSTRLEN] = "";
-    if (CERTPATROL_OK != CertPatrol_get_peer_addr(fd, &proto, protoname,
-                                                  PROTONAMELEN, &port, addr))
+    if (PATROL_OK != PATROL_get_peer_addr(fd, &proto, protoname,
+                                          PROTONAMELEN, &port, addr))
         return GNUTLS_E_CERTIFICATE_ERROR;
 
     unsigned int chain_len = 0;
     const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
                                                                &chain_len);
 
-    int cp_ret = CertPatrol_GnuTLS_verify(chain, chain_len,
-                                          hostname, strlen(hostname),
-                                          addr, strlen(addr),
-                                          protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> CP result = %d\n", cp_ret);
+    int pret = PATROL_GnuTLS_verify(chain, chain_len,
+                                    hostname, strlen(hostname),
+                                    addr, strlen(addr),
+                                    protoname, strlen(protoname), port);
+    LOG_DEBUG(">>> patrol result = %d\n", pret);
 
-    return cp_ret == CERTPATROL_OK
+    return pret == PATROL_OK
         ? GNUTLS_E_SUCCESS
         : GNUTLS_E_CERTIFICATE_ERROR;
 }

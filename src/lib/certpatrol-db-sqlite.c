@@ -12,11 +12,11 @@
 
 static sqlite3 *db;
 
-CertPatrolRC
-CertPatrol_db_open()
+PatrolRC
+PATROL_db_open()
 {
     if (db)
-        return CERTPATROL_DONE; // already open
+        return PATROL_DONE; // already open
 
     static char *path = NULL;
     if (!path) {
@@ -38,7 +38,7 @@ CertPatrol_db_open()
     if (ret != SQLITE_OK) {
       LOG_ERROR("Can't open database: %s\n", sqlite3_errmsg(db));
       sqlite3_close(db);
-      return CERTPATROL_ERROR;
+      return PATROL_ERROR;
     }
 
     ret = sqlite3_exec(db,
@@ -77,29 +77,29 @@ CertPatrol_db_open()
 	LOG_ERROR("Error inserting values: %s (#%d)\n", sqlite3_errmsg(db), ret);
     }
 
-    return CERTPATROL_OK;
+    return PATROL_OK;
 }
 
-CertPatrolRC
-CertPatrol_db_close()
+PatrolRC
+PATROL_db_close()
 {
     if (sqlite3_close(db) == SQLITE_OK) {
         db = NULL;
-        return CERTPATROL_OK;
+        return PATROL_OK;
     }
-    return CERTPATROL_ERROR;
+    return PATROL_ERROR;
 }
 
-CertPatrolRC
-CertPatrol_get_certs (const char *host, size_t host_len,
+PatrolRC
+PATROL_get_certs (const char *host, size_t host_len,
                       const char *proto, size_t proto_len, uint16_t port,
-                      CertPatrolStatus status, bool wildcard,
-                      CertPatrolRecord **records, size_t *records_len)
+                      PatrolStatus status, bool wildcard,
+                      PatrolRecord **records, size_t *records_len)
 {
     if (!db) {
-        CertPatrol_db_open();
+        PATROL_db_open();
         if (!db)
-            return CERTPATROL_ERROR;
+            return PATROL_ERROR;
     }
 
     static sqlite3_stmt *stmt_exact = NULL, *stmt_wild = NULL;
@@ -126,7 +126,7 @@ CertPatrol_get_certs (const char *host, size_t host_len,
             &stmt_wild, NULL);
     }
 
-    int ret = CERTPATROL_ERROR;
+    int ret = PATROL_ERROR;
     sqlite3_stmt *stmt = stmt_exact;
     const char *host_wild = NULL;
     if (wildcard) {
@@ -146,7 +146,7 @@ CertPatrol_get_certs (const char *host, size_t host_len,
 	LOG_ERROR("find_certs: bind: %s (#%d)\n",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
-        CertPatrolRecord *rec = NULL;
+        PatrolRecord *rec = NULL;
         int r;
         *records = NULL;
         *records_len = 0;
@@ -156,9 +156,9 @@ CertPatrol_get_certs (const char *host, size_t host_len,
             case SQLITE_ROW:
                 LOG_DEBUG(">>> row\n");
                 if (!rec) {
-                    rec = *records = malloc(sizeof(CertPatrolRecord));
+                    rec = *records = malloc(sizeof(PatrolRecord));
                 } else {
-                    rec = rec->next = malloc(sizeof(CertPatrolRecord));
+                    rec = rec->next = malloc(sizeof(PatrolRecord));
                 }
 
                 rec->id = sqlite3_column_int64(stmt, 0);
@@ -186,7 +186,7 @@ CertPatrol_get_certs (const char *host, size_t host_len,
                 break;
             case SQLITE_DONE:
                 LOG_DEBUG(">>> done\n");
-                ret = *records_len ? CERTPATROL_OK : CERTPATROL_DONE;
+                ret = *records_len ? PATROL_OK : PATROL_DONE;
                 break;
             default:
                 LOG_ERROR("find_certs: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
@@ -199,21 +199,21 @@ CertPatrol_get_certs (const char *host, size_t host_len,
     return ret;
 }
 
-CertPatrolRC
-CertPatrol_add_cert (const char *host, size_t host_len,
+PatrolRC
+PATROL_add_cert (const char *host, size_t host_len,
                      const char *proto, size_t proto_len,
-                     uint16_t port, CertPatrolStatus status,
-                     const CertPatrolData *chain, size_t chain_len,
+                     uint16_t port, PatrolStatus status,
+                     const PatrolData *chain, size_t chain_len,
                      const unsigned char *pin_pubkey, size_t pin_pubkey_len,
                      int64_t pin_expiry, int64_t *cert_id)
 {
     if (!db) {
-        CertPatrol_db_open();
+        PATROL_db_open();
         if (!db)
-            return CERTPATROL_ERROR;
+            return PATROL_ERROR;
     }
     if (!chain_len)
-        return CERTPATROL_ERROR;
+        return PATROL_ERROR;
 
     static sqlite3_stmt *stmt_sel_cert = NULL, *stmt_begin = NULL, *stmt_ins_cert = NULL,
                         *stmt_ins_peer = NULL, *stmt_commit = NULL, *stmt_rollback = NULL;
@@ -241,7 +241,7 @@ CertPatrol_add_cert (const char *host, size_t host_len,
     if (!stmt_rollback)
         sqlite3_prepare_v2(db, C2ARG("ROLLBACK"), &stmt_rollback, NULL);
 
-    CertPatrolRC ret = CERTPATROL_ERROR;
+    PatrolRC ret = PATROL_ERROR;
     char *ca_chain = NULL;
     size_t i, ca_chain_len = 0;
     *cert_id = -1;
@@ -254,10 +254,10 @@ CertPatrol_add_cert (const char *host, size_t host_len,
         switch (sqlite3_step(stmt_sel_cert)) {
         case SQLITE_ROW:
             *cert_id = sqlite3_column_int64(stmt_sel_cert, 0);
-            ret = CERTPATROL_OK;
+            ret = PATROL_OK;
             break;
         case SQLITE_DONE:
-            ret = CERTPATROL_OK;
+            ret = PATROL_OK;
             break;
         case SQLITE_BUSY:
         default:
@@ -267,10 +267,10 @@ CertPatrol_add_cert (const char *host, size_t host_len,
     }
 
     sqlite3_reset(stmt_sel_cert);
-    if (ret == CERTPATROL_ERROR)
+    if (ret == PATROL_ERROR)
         return ret;
 
-    ret = CERTPATROL_ERROR;
+    ret = PATROL_ERROR;
 
     switch (sqlite3_step(stmt_begin)) {
     case SQLITE_DONE:
@@ -331,7 +331,7 @@ CertPatrol_add_cert (const char *host, size_t host_len,
         break;
     case SQLITE_CONSTRAINT:
         if (*cert_id >= 0)
-            ret = CERTPATROL_DONE;
+            ret = PATROL_DONE;
         sqlite3_step(stmt_rollback);
         sqlite3_reset(stmt_rollback);
         goto add_cert_end;
@@ -345,7 +345,7 @@ CertPatrol_add_cert (const char *host, size_t host_len,
 
     switch (sqlite3_step(stmt_commit)) {
     case SQLITE_DONE:
-        ret = CERTPATROL_OK;
+        ret = PATROL_OK;
         break;
     case SQLITE_BUSY:
     default:
@@ -366,15 +366,15 @@ add_cert_end:
     return ret;
 }
 
-CertPatrolRC
-CertPatrol_set_cert_status (const char *host, size_t host_len,
+PatrolRC
+PATROL_set_cert_status (const char *host, size_t host_len,
                             const char *proto, size_t proto_len,
                             uint16_t port, int64_t cert_id, int status)
 {
     if (!db) {
-        CertPatrol_db_open();
+        PATROL_db_open();
         if (!db)
-            return CERTPATROL_ERROR;
+            return PATROL_ERROR;
     }
 
     static sqlite3_stmt *stmt = NULL;
@@ -387,7 +387,7 @@ CertPatrol_set_cert_status (const char *host, size_t host_len,
             &stmt, NULL);
     }
 
-    CertPatrolRC ret = CERTPATROL_ERROR;
+    PatrolRC ret = PATROL_ERROR;
 
     if (sqlite3_bind_int(stmt, 1, cert_id) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 2, status) != SQLITE_OK ||
@@ -413,16 +413,16 @@ CertPatrol_set_cert_status (const char *host, size_t host_len,
     return ret;
 }
 
-CertPatrolRC
-CertPatrol_set_cert_active (const char *host, size_t host_len,
+PatrolRC
+PATROL_set_cert_active (const char *host, size_t host_len,
                             const char *proto, size_t proto_len,
                             uint16_t port, int64_t cert_id,
-                            CertPatrolPinMode pin_mode)
+                            PatrolPinMode pin_mode)
 {
     if (!db) {
-        CertPatrol_db_open();
+        PATROL_db_open();
         if (!db)
-            return CERTPATROL_ERROR;
+            return PATROL_ERROR;
     }
 
     static sqlite3_stmt *stmt_multi = NULL, *stmt_excl = NULL;
@@ -443,8 +443,8 @@ CertPatrol_set_cert_active (const char *host, size_t host_len,
             &stmt_excl, NULL);
     }
 
-    sqlite3_stmt *stmt = pin_mode == CERTPATROL_PIN_EXCLUSIVE ? stmt_excl : stmt_multi;
-    CertPatrolRC ret = CERTPATROL_ERROR;
+    sqlite3_stmt *stmt = pin_mode == PATROL_PIN_EXCLUSIVE ? stmt_excl : stmt_multi;
+    PatrolRC ret = PATROL_ERROR;
 
     if (sqlite3_bind_int64(stmt, 1, cert_id) != SQLITE_OK ||
         sqlite3_bind_text(stmt, 2, host, host_len, SQLITE_STATIC) != SQLITE_OK ||
@@ -470,14 +470,14 @@ CertPatrol_set_cert_active (const char *host, size_t host_len,
 }
 
 int
-CertPatrol_set_cert_seen (const char *host, size_t host_len,
+PATROL_set_cert_seen (const char *host, size_t host_len,
                           const char *proto, size_t proto_len,
                           uint16_t port, int64_t cert_id)
 {
     if (!db)
-        CertPatrol_db_open();
+        PATROL_db_open();
     if (!db)
-        return CERTPATROL_ERROR;
+        return PATROL_ERROR;
 
     static sqlite3_stmt *stmt = NULL;
     if (!stmt) {
@@ -490,7 +490,7 @@ CertPatrol_set_cert_seen (const char *host, size_t host_len,
             &stmt, NULL);
     }
 
-    CertPatrolRC ret = CERTPATROL_ERROR;
+    PatrolRC ret = PATROL_ERROR;
 
     if (sqlite3_bind_int64(stmt, 1, cert_id) != SQLITE_OK ||
         sqlite3_bind_text(stmt, 2, host, host_len, SQLITE_STATIC) != SQLITE_OK ||
@@ -515,17 +515,17 @@ CertPatrol_set_cert_seen (const char *host, size_t host_len,
     return ret;
 }
 
-CertPatrolRC
-CertPatrol_set_pin (const char *host, size_t host_len,
+PatrolRC
+PATROL_set_pin (const char *host, size_t host_len,
                     const char *proto, size_t proto_len,
                     uint16_t port, int64_t cert_id,
                     const unsigned char *pin_pubkey, size_t pin_pubkey_len,
                     int64_t pin_expiry)
 {
     if (!db) {
-        CertPatrol_db_open();
+        PATROL_db_open();
         if (!db)
-            return CERTPATROL_ERROR;
+            return PATROL_ERROR;
     }
 
     static sqlite3_stmt *stmt = NULL;
@@ -541,7 +541,7 @@ CertPatrol_set_pin (const char *host, size_t host_len,
             &stmt, NULL);
     }
 
-    int ret = CERTPATROL_ERROR;
+    int ret = PATROL_ERROR;
 
     if (sqlite3_bind_blob(stmt, 1, pin_pubkey, pin_pubkey_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int64(stmt, 2, pin_expiry) != SQLITE_OK ||

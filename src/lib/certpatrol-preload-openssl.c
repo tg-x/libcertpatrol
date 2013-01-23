@@ -9,6 +9,8 @@
 
 #define LIBSSL "libssl.so"
 
+#define PROTONAMELEN 32
+
 /** Get result of peer certificate verification.
  *
  * @return X509_V_OK on success, error codes are documented in openssl-verify(1).
@@ -38,19 +40,18 @@ SSL_get_verify_result (const SSL *ssl)
 
     int proto;
     uint16_t port;
-    #define PROTONAMELEN 32
     char protoname[PROTONAMELEN];
     char addr[INET6_ADDRSTRLEN];
-    if (CertPatrol_get_peer_addr(fd, &proto, protoname, PROTONAMELEN, &port, addr) != 0)
+    if (PATROL_get_peer_addr(fd, &proto, protoname, PROTONAMELEN, &port, addr) != 0)
         return ret;
 
-    int cp_ret = CertPatrol_OpenSSL_verify(SSL_get_peer_cert_chain(ssl),
-                                           hostname, strlen(hostname),
-                                           addr, strlen(addr),
-                                           protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> CP result = %d\n", cp_ret);
+    int pret = PATROL_OpenSSL_verify(SSL_get_peer_cert_chain(ssl),
+                                     hostname, strlen(hostname),
+                                     addr, strlen(addr),
+                                     protoname, strlen(protoname), port);
+    LOG_DEBUG(">>> patrol result = %d\n", pret);
 
-    return cp_ret == CERTPATROL_OK ? X509_V_OK : X509_V_ERR_CERT_UNTRUSTED;
+    return pret == PATROL_OK ? X509_V_OK : X509_V_ERR_CERT_UNTRUSTED;
 }
 
 #ifdef DEBUG

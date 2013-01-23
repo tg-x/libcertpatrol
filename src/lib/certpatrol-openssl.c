@@ -4,22 +4,22 @@
 
 #include <openssl/ssl.h>
 
-CertPatrolRC
-CertPatrol_OpenSSL_verify (const STACK_OF(X509) *chain,
-                           const char *host, size_t host_len,
-                           const char *addr, size_t addr_len,
-                           const char *proto, size_t proto_len,
-                           uint16_t port)
+PatrolRC
+PATROL_OPENSSL_verify (const STACK_OF(X509) *chain,
+                       const char *host, size_t host_len,
+                       const char *addr, size_t addr_len,
+                       const char *proto, size_t proto_len,
+                       uint16_t port)
 {
     LOG_DEBUG(">> verify: %d, %s, %s, %s, %d\n",
               chain != NULL, host, addr, proto, port);
 
-    CertPatrolRC ret = CERTPATROL_ERROR;
+    PatrolRC ret = PATROL_ERROR;
     if (!chain)
         return ret;
 
     size_t ch_len = sk_X509_num(chain);
-    CertPatrolData *ch = malloc(ch_len * sizeof(CertPatrolData));
+    PatrolData *ch = malloc(ch_len * sizeof(PatrolData));
     int i, r;
 
     for (i = 0; i < ch_len; i++) {
@@ -28,8 +28,8 @@ CertPatrol_OpenSSL_verify (const STACK_OF(X509) *chain,
         ch[i].size = r >= 0 ? r : 0;
     }
 
-    ret = CertPatrol_verify(ch, ch_len, host, host_len,
-                            addr, addr_len, proto, proto_len, port);
+    ret = PATROL_verify(ch, ch_len, host, host_len,
+                        addr, addr_len, proto, proto_len, port);
 
     for (i = 0; i < ch_len; i++)
         OPENSSL_free(ch[i].data);

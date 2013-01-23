@@ -13,10 +13,10 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
-CertPatrolRC
-CertPatrol_get_peer_addr(int fd, int *proto,
-                         char *protoname, size_t protonamelen,
-                         uint16_t *port, char *addrstr)
+PatrolRC
+PATROL_get_peer_addr (int fd, int *proto,
+                      char *protoname, size_t protonamelen,
+                      uint16_t *port, char *addrstr)
 {
     socklen_t length = sizeof(int);
 
@@ -62,17 +62,17 @@ CertPatrol_get_peer_addr(int fd, int *proto,
             inet_ntop(addr.sa_family, &(addr4->sin_addr), addrstr, INET_ADDRSTRLEN);
     }
 
-    return CERTPATROL_OK;
+    return PATROL_OK;
 }
 
-CertPatrolCmdRC
-CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
-                     uint16_t port, int64_t cert_id, bool wait)
+PatrolCmdRC
+PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
+                 uint16_t port, int64_t cert_id, bool wait)
 {
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
-        return CERTPATROL_ERROR;
+        return PATROL_ERROR;
     }
     if (pid == 0) {
         char id[21], prt[6];
@@ -91,6 +91,6 @@ CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
         LOG_DEBUG(">>> cmd returned %d\n", ret);
         return ret;
     } else {
-        return CERTPATROL_CMD_ACCEPT;
+        return PATROL_CMD_ACCEPT;
     }
 }

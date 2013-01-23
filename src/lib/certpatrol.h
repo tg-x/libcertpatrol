@@ -1,5 +1,5 @@
-#ifndef CERTPATROL_H
-# define CERTPATROL_H
+#ifndef PATROL_H
+# define PATROL_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -7,66 +7,66 @@
 #include <gnutls/gnutls.h>
 
 typedef enum {
-    CERTPATROL_ERROR = -1,
-    CERTPATROL_OK = 0,
-    CERTPATROL_DONE = 1,
-} CertPatrolRC;
+    PATROL_ERROR = -1,
+    PATROL_OK = 0,
+    PATROL_DONE = 1,
+} PatrolRC;
 
 typedef enum {
-    CERTPATROL_PIN_EXCLUSIVE = 0,
-    CERTPATROL_PIN_MULTIPLE = 1,
-} CertPatrolPinMode;
+    PATROL_PIN_EXCLUSIVE = 0,
+    PATROL_PIN_MULTIPLE = 1,
+} PatrolPinMode;
 
 typedef enum {
-    CERTPATROL_PIN_TRUST_ANCHOR = -1,
-    CERTPATROL_PIN_END_ENTITY = 0,
-    CERTPATROL_PIN_ISSUER = 1,
-} CertPatrolPinLevel;
+    PATROL_PIN_TRUST_ANCHOR = -1,
+    PATROL_PIN_END_ENTITY = 0,
+    PATROL_PIN_ISSUER = 1,
+} PatrolPinLevel;
 
 typedef enum {
-    CERTPATROL_STATUS_REJECTED = -1,
-    CERTPATROL_STATUS_INACTIVE = 0,
-    CERTPATROL_STATUS_ACTIVE = 1,
-} CertPatrolStatus;
+    PATROL_STATUS_REJECTED = -1,
+    PATROL_STATUS_INACTIVE = 0,
+    PATROL_STATUS_ACTIVE = 1,
+} PatrolStatus;
 
 typedef enum {
-    CERTPATROL_CMD_ACCEPT = 0,
-    CERTPATROL_CMD_ACCEPT_ADD = 1,
-    CERTPATROL_CMD_CONTINUE = 2,
-    CERTPATROL_CMD_REJECT = 3,
-} CertPatrolCmdRC;
+    PATROL_CMD_ACCEPT = 0,
+    PATROL_CMD_ACCEPT_ADD = 1,
+    PATROL_CMD_CONTINUE = 2,
+    PATROL_CMD_REJECT = 3,
+} PatrolCmdRC;
 
-typedef gnutls_datum_t CertPatrolData;
+typedef gnutls_datum_t PatrolData;
 
-#define CERTPATROL_DATA(_data, _size)                   \
-    (CertPatrolData) {					\
-	.data = _data,					\
-	.size = _size,					\
+#define PATROL_DATA(_data, _size)               \
+    (PatrolData) {                              \
+	.data = _data,                          \
+        .size = _size,                          \
     }
 
-typedef struct CertPatrolRecord CertPatrolRecord;
+typedef struct PatrolRecord PatrolRecord;
 
-struct CertPatrolRecord {
-    int64_t id;		///< ID of peer certificate.
-    CertPatrolStatus status;	///< Certificate status.
-    int64_t first_seen;	///< Timestamp when the certificate was first seen for this peer.
-    int64_t last_seen;	///< Timestamp when the certificate was last seen for this peer.
-    int64_t count_seen;	///< Number of times the certificate was seen for this peer.
-    CertPatrolData cert;	///< DER-encoded end entity certificate.
-    CertPatrolData ca_chain;	///< DER-encoded CA chain.
-    CertPatrolData pin_pubkey;	///< Pinned public key.
-    int64_t pin_expiry;	///< Expiry of pin.
-    CertPatrolRecord *next;
+struct PatrolRecord {
+    int64_t id;			///< ID of peer certificate.
+    PatrolStatus status;	///< Certificate status.
+    int64_t first_seen;		///< Timestamp when the certificate was first seen for this peer.
+    int64_t last_seen;		///< Timestamp when the certificate was last seen for this peer.
+    int64_t count_seen;		///< Number of times the certificate was seen for this peer.
+    PatrolData cert;		///< DER-encoded end entity certificate.
+    PatrolData ca_chain;	///< DER-encoded CA chain.
+    PatrolData pin_pubkey;	///< Pinned public key.
+    int64_t pin_expiry;		///< Expiry of pin.
+    PatrolRecord *next;
 };
 
 int
-CertPatrol_get_peer_addr(int fd, int *proto,
-                         char *protoname, size_t protonamelen,
-                         uint16_t *port, char *addrstr);
+PATROL_get_peer_addr (int fd, int *proto,
+                      char *protoname, size_t protonamelen,
+                      uint16_t *port, char *addrstr);
 
-CertPatrolCmdRC
-CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
-                     uint16_t port, int64_t cert_id, bool wait);
+PatrolCmdRC
+PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
+                 uint16_t port, int64_t cert_id, bool wait);
 
 /** Get stored certificates of a peer.
  *
@@ -80,58 +80,58 @@ CertPatrol_exec_cmd (const char *cmd, const char *host, const char *proto,
  * @param certs		Certificates (return).
  * @param certs_len	Length of certificates (return).
  */
-CertPatrolRC
-CertPatrol_get_certs (const char *host, size_t host_len,
-                      const char *proto, size_t proto_len, uint16_t port,
-                      CertPatrolStatus status, bool wildcard,
-                      CertPatrolRecord **records, size_t *records_len);
+PatrolRC
+PATROL_get_certs (const char *host, size_t host_len,
+                  const char *proto, size_t proto_len, uint16_t port,
+                  PatrolStatus status, bool wildcard,
+                  PatrolRecord **records, size_t *records_len);
 
-CertPatrolRC
-CertPatrol_add_cert (const char *host, size_t host_len,
-                     const char *proto, size_t proto_len,
-                     uint16_t port, CertPatrolStatus status,
-                     const CertPatrolData *chain, size_t chain_len,
-                     const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                     int64_t pin_expiry,
-                     int64_t *cert_id);
+PatrolRC
+PATROL_add_cert (const char *host, size_t host_len,
+                 const char *proto, size_t proto_len,
+                 uint16_t port, PatrolStatus status,
+                 const PatrolData *chain, size_t chain_len,
+                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
+                 int64_t pin_expiry,
+                 int64_t *cert_id);
 
-CertPatrolRC
-CertPatrol_set_cert_status (const char *host, size_t host_len,
-                            const char *proto, size_t proto_len,
-                            uint16_t port, int64_t cert_id,
-                            int status);
+PatrolRC
+PATROL_set_cert_status (const char *host, size_t host_len,
+                        const char *proto, size_t proto_len,
+                        uint16_t port, int64_t cert_id,
+                        int status);
 
-CertPatrolRC
-CertPatrol_set_cert_active (const char *host, size_t host_len,
-                            const char *proto, size_t proto_len,
-                            uint16_t port, int64_t cert_id,
-                            CertPatrolPinMode mode);
+PatrolRC
+PATROL_set_cert_active (const char *host, size_t host_len,
+                        const char *proto, size_t proto_len,
+                        uint16_t port, int64_t cert_id,
+                        PatrolPinMode mode);
 
 int
-CertPatrol_set_cert_seen (const char *host, size_t host_len,
-                          const char *proto, size_t proto_len,
-                          uint16_t port, int64_t cert_id);
+PATROL_set_cert_seen (const char *host, size_t host_len,
+                      const char *proto, size_t proto_len,
+                      uint16_t port, int64_t cert_id);
 
-CertPatrolRC
-CertPatrol_set_pin (const char *host, size_t host_len,
-                    const char *proto, size_t proto_len,
-                    uint16_t port, int64_t cert_id,
-                    const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                    int64_t expiry);
+PatrolRC
+PATROL_set_pin (const char *host, size_t host_len,
+                const char *proto, size_t proto_len,
+                uint16_t port, int64_t cert_id,
+                const unsigned char *pin_pubkey, size_t pin_pubkey_len,
+                int64_t expiry);
 
 #include <certpatrol/certpatrol-gnutls.h>
 
 static inline
-CertPatrolRC
-CertPatrol_verify (const CertPatrolData *chain, size_t chain_len,
-                   const char *host, size_t host_len,
-                   const char *addr, size_t addr_len,
-                   const char *proto, size_t proto_len,
-                   uint16_t port)
+PatrolRC
+PATROL_verify (const PatrolData *chain, size_t chain_len,
+               const char *host, size_t host_len,
+               const char *addr, size_t addr_len,
+               const char *proto, size_t proto_len,
+               uint16_t port)
 {
-    return CertPatrol_GnuTLS_verify((gnutls_datum_t *)chain, chain_len,
-                                    host, host_len, addr, addr_len,
-                                    proto, proto_len, port);
+    return PATROL_GNUTLS_verify((gnutls_datum_t *)chain, chain_len,
+                                host, host_len, addr, addr_len,
+                                proto, proto_len, port);
 }
 
-#endif // CERTPATROL_H
+#endif // PATROL_H

@@ -1,7 +1,7 @@
 #include "common.h"
-#include "certpatrol.h"
-#include "certpatrol-nss.h"
-#include "certpatrol-preload.h"
+#include "patrol.h"
+#include "patrol-nss.h"
+#include "patrol-preload.h"
 
 #define LIBNSS3 "libnss3.so"
 #define LIBSSL3 "libssl3.so"

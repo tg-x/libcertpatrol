@@ -1,7 +1,7 @@
 #include "common.h"
-#include "certpatrol.h"
-#include "certpatrol-gnutls.h"
-#include "certpatrol-preload.h"
+#include "patrol.h"
+#include "patrol-gnutls.h"
+#include "patrol-preload.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -73,7 +73,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
     const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
                                                                &chain_len);
 
-    int pret = PATROL_GnuTLS_verify(chain, chain_len,
+    int pret = PATROL_GNUTLS_verify(chain, chain_len,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);
@@ -141,7 +141,7 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
     const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
                                                                &chain_len);
 
-    int pret = PATROL_GnuTLS_verify(chain, chain_len,
+    int pret = PATROL_GNUTLS_verify(chain, chain_len,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);

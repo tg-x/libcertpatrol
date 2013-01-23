@@ -1,7 +1,7 @@
 #include "common.h"
-#include "certpatrol.h"
-#include "certpatrol-openssl.h"
-#include "certpatrol-preload.h"
+#include "patrol.h"
+#include "patrol-openssl.h"
+#include "patrol-preload.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -45,7 +45,7 @@ SSL_get_verify_result (const SSL *ssl)
     if (PATROL_get_peer_addr(fd, &proto, protoname, PROTONAMELEN, &port, addr) != 0)
         return ret;
 
-    int pret = PATROL_OpenSSL_verify(SSL_get_peer_cert_chain(ssl),
+    int pret = PATROL_OPENSSL_verify(SSL_get_peer_cert_chain(ssl),
                                      hostname, strlen(hostname),
                                      addr, strlen(addr),
                                      protoname, strlen(protoname), port);

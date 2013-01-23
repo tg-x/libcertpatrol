@@ -1,6 +1,6 @@
 #include "common.h"
-#include "certpatrol.h"
-#include "certpatrol-gnutls.h"
+#include "patrol.h"
+#include "patrol-gnutls.h"
 
 #include <stdlib.h>
 #include <stdint.h>

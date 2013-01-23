@@ -1,8 +1,8 @@
 #### certpatrol ############################################
 
 add_library(certpatrol SHARED
-  certpatrol.c
-  certpatrol-db-sqlite.c
+  patrol.c
+  patrol-db-sqlite.c
 )
 target_link_libraries(certpatrol
     ${SQLITE_LIBRARIES}
@@ -12,7 +12,7 @@ install(TARGETS certpatrol DESTINATION lib)
 #### certpatrol-gnutls #####################################
 
 add_library(certpatrol-gnutls SHARED
-  certpatrol-gnutls.c
+  patrol-gnutls.c
 )
 target_link_libraries(certpatrol-gnutls
     certpatrol
@@ -24,7 +24,7 @@ install(TARGETS certpatrol-gnutls DESTINATION lib)
 
 if(OPENSSL_LIBRARIES)
     add_library(certpatrol-openssl SHARED
-        certpatrol-openssl.c
+        patrol-openssl.c
     )
     target_link_libraries(certpatrol-openssl
         certpatrol
@@ -38,7 +38,7 @@ endif()
 
 if(NSS_LIBRARIES)
     add_library(certpatrol-nss SHARED
-        certpatrol-nss.c
+        patrol-nss.c
     )
     target_link_libraries(certpatrol-nss
         certpatrol
@@ -50,14 +50,14 @@ endif()
 
 #### certpatrol-preload ####################################
 
-set(SRC certpatrol-preload-gnutls.c)
+set(SRC patrol-preload-gnutls.c)
 
 if(OPENSSL_LIBRARIES)
-   set (SRC ${SRC} certpatrol-preload-openssl.c)
+   set (SRC ${SRC} patrol-preload-openssl.c)
 endif()
 
 if(NSS_LIBRARIES)
-   set (SRC ${SRC} certpatrol-preload-nss.c)
+   set (SRC ${SRC} patrol-preload-nss.c)
 endif()
 
 add_library(certpatrol-preload SHARED ${SRC})

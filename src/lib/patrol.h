@@ -119,7 +119,7 @@ PATROL_set_pin (const char *host, size_t host_len,
                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
                 int64_t expiry);
 
-#include <certpatrol/certpatrol-gnutls.h>
+#include <certpatrol/patrol-gnutls.h>
 
 static inline
 PatrolRC

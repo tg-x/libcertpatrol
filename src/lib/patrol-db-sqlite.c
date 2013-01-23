@@ -1,5 +1,5 @@
 #include "common.h"
-#include "certpatrol.h"
+#include "patrol.h"
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -36,9 +36,9 @@ PATROL_db_open()
     int ret = sqlite3_open(path, &db);
 
     if (ret != SQLITE_OK) {
-      LOG_ERROR("Can't open database: %s\n", sqlite3_errmsg(db));
-      sqlite3_close(db);
-      return PATROL_ERROR;
+        LOG_ERROR("Can't open database: %s\n", sqlite3_errmsg(db));
+        sqlite3_close(db);
+        return PATROL_ERROR;
     }
 
     ret = sqlite3_exec(db,
@@ -92,9 +92,9 @@ PATROL_db_close()
 
 PatrolRC
 PATROL_get_certs (const char *host, size_t host_len,
-                      const char *proto, size_t proto_len, uint16_t port,
-                      PatrolStatus status, bool wildcard,
-                      PatrolRecord **records, size_t *records_len)
+                  const char *proto, size_t proto_len, uint16_t port,
+                  PatrolStatus status, bool wildcard,
+                  PatrolRecord **records, size_t *records_len)
 {
     if (!db) {
         PATROL_db_open();
@@ -201,11 +201,11 @@ PATROL_get_certs (const char *host, size_t host_len,
 
 PatrolRC
 PATROL_add_cert (const char *host, size_t host_len,
-                     const char *proto, size_t proto_len,
-                     uint16_t port, PatrolStatus status,
-                     const PatrolData *chain, size_t chain_len,
-                     const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                     int64_t pin_expiry, int64_t *cert_id)
+                 const char *proto, size_t proto_len,
+                 uint16_t port, PatrolStatus status,
+                 const PatrolData *chain, size_t chain_len,
+                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
+                 int64_t pin_expiry, int64_t *cert_id)
 {
     if (!db) {
         PATROL_db_open();
@@ -368,8 +368,8 @@ add_cert_end:
 
 PatrolRC
 PATROL_set_cert_status (const char *host, size_t host_len,
-                            const char *proto, size_t proto_len,
-                            uint16_t port, int64_t cert_id, int status)
+                        const char *proto, size_t proto_len,
+                        uint16_t port, int64_t cert_id, int status)
 {
     if (!db) {
         PATROL_db_open();
@@ -415,9 +415,9 @@ PATROL_set_cert_status (const char *host, size_t host_len,
 
 PatrolRC
 PATROL_set_cert_active (const char *host, size_t host_len,
-                            const char *proto, size_t proto_len,
-                            uint16_t port, int64_t cert_id,
-                            PatrolPinMode pin_mode)
+                        const char *proto, size_t proto_len,
+                        uint16_t port, int64_t cert_id,
+                        PatrolPinMode pin_mode)
 {
     if (!db) {
         PATROL_db_open();
@@ -471,8 +471,8 @@ PATROL_set_cert_active (const char *host, size_t host_len,
 
 int
 PATROL_set_cert_seen (const char *host, size_t host_len,
-                          const char *proto, size_t proto_len,
-                          uint16_t port, int64_t cert_id)
+                      const char *proto, size_t proto_len,
+                      uint16_t port, int64_t cert_id)
 {
     if (!db)
         PATROL_db_open();
@@ -517,10 +517,10 @@ PATROL_set_cert_seen (const char *host, size_t host_len,
 
 PatrolRC
 PATROL_set_pin (const char *host, size_t host_len,
-                    const char *proto, size_t proto_len,
-                    uint16_t port, int64_t cert_id,
-                    const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                    int64_t pin_expiry)
+                const char *proto, size_t proto_len,
+                uint16_t port, int64_t cert_id,
+                const unsigned char *pin_pubkey, size_t pin_pubkey_len,
+                int64_t pin_expiry)
 {
     if (!db) {
         PATROL_db_open();

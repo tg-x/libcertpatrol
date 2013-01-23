@@ -1,5 +1,5 @@
 #include "common.h"
-#include "certpatrol.h"
+#include "patrol.h"
 
 #include <stdlib.h>
 #include <stdint.h>

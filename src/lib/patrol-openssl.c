@@ -1,6 +1,6 @@
 #include "common.h"
-#include "certpatrol.h"
-#include "certpatrol-openssl.h"
+#include "patrol.h"
+#include "patrol-openssl.h"
 
 #include <openssl/ssl.h>
 

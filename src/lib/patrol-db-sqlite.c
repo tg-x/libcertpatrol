@@ -1,3 +1,5 @@
+#define LOG_TARGET "CertPatrol-db"
+
 #include "common.h"
 #include "patrol.h"
 
@@ -11,6 +13,14 @@
 #include <sqlite3.h>
 
 static sqlite3 *db;
+
+#ifdef DEBUG
+static void
+db_trace (void *arg, const char *sql)
+{
+    LOG_DEBUG("[DB] %s\n", sql);
+}
+#endif
 
 PatrolRC
 PATROL_db_open()
@@ -41,6 +51,10 @@ PATROL_db_open()
         return PATROL_ERROR;
     }
 
+#ifdef DEBUG
+    sqlite3_trace(db, db_trace, NULL);
+#endif
+
     ret = sqlite3_exec(db,
                        "PRAGMA read_uncommitted = true;"
                        "PRAGMA foreign_keys = ON;"
@@ -51,7 +65,8 @@ PATROL_db_open()
 
                        "CREATE TABLE IF NOT EXISTS certs ("
                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                       "  cert BLOB UNIQUE, ca_chain BLOB, pin_pubkey BLOB, pin_expiry INTEGER"
+                       "  cert BLOB UNIQUE, ca_chain BLOB, "
+                       "  pin_pubkey BLOB, pin_expiry INTEGER"
                        ");"
 
                        "CREATE TABLE IF NOT EXISTS peers ("
@@ -88,6 +103,40 @@ PATROL_db_close()
         return PATROL_OK;
     }
     return PATROL_ERROR;
+}
+
+static int
+fill_record (sqlite3_stmt *stmt, PatrolRecord *rec)
+{
+    rec->id = sqlite3_column_int64(stmt, 0);
+    rec->status = sqlite3_column_int(stmt, 1);
+    rec->first_seen = sqlite3_column_int64(stmt, 2);
+    rec->last_seen = sqlite3_column_int64(stmt, 3);
+    rec->count_seen = sqlite3_column_int64(stmt, 4);
+
+    rec->chain_len = 3; // FIXME
+    rec->chain = malloc(rec->chain_len * sizeof(PatrolData));
+
+    rec->chain[0].size = sqlite3_column_bytes(stmt, 5);
+    rec->chain[0].data = malloc(rec->chain[0].size);
+    memcpy(rec->chain[0].data, sqlite3_column_blob(stmt, 5), rec->chain[0].size);
+
+    rec->chain[1].size = sqlite3_column_bytes(stmt, 6);
+    rec->chain[1].data = malloc(rec->chain[1].size);
+    memcpy(rec->chain[1].data, sqlite3_column_blob(stmt, 6),
+           rec->chain[1].size);
+
+    rec->chain[2] = rec->chain[1]; // FIXME
+
+    rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
+    rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
+    memcpy(rec->pin_pubkey.data, sqlite3_column_blob(stmt, 7),
+           rec->pin_pubkey.size);
+
+    rec->pin_expiry = sqlite3_column_int64(stmt, 8);
+    rec->next = NULL;
+
+    return PATROL_OK;
 }
 
 PatrolRC
@@ -143,7 +192,7 @@ PATROL_get_certs (const char *host, size_t host_len,
          sqlite3_bind_text(stmt, 5, host_wild, host_len - (host_wild - host),
                            SQLITE_STATIC) != SQLITE_OK)) {
 
-	LOG_ERROR("find_certs: bind: %s (#%d)\n",
+	LOG_ERROR("get_certs: bind: %s (#%d)\n",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
         PatrolRecord *rec = NULL;
@@ -154,45 +203,73 @@ PATROL_get_certs (const char *host, size_t host_len,
             r = sqlite3_step(stmt);
             switch (r) {
             case SQLITE_ROW:
-                LOG_DEBUG(">>> row\n");
                 if (!rec) {
                     rec = *records = malloc(sizeof(PatrolRecord));
                 } else {
                     rec = rec->next = malloc(sizeof(PatrolRecord));
                 }
-
-                rec->id = sqlite3_column_int64(stmt, 0);
-                rec->status = sqlite3_column_int(stmt, 1);
-                rec->first_seen = sqlite3_column_int64(stmt, 2);
-                rec->last_seen = sqlite3_column_int64(stmt, 3);
-                rec->count_seen = sqlite3_column_int64(stmt, 4);
-
-                rec->cert.size = sqlite3_column_bytes(stmt, 5);
-                rec->cert.data = malloc(rec->cert.size);
-                memcpy(rec->cert.data, sqlite3_column_blob(stmt, 5), rec->cert.size);
-
-                rec->ca_chain.size = sqlite3_column_bytes(stmt, 6);
-                rec->ca_chain.data = malloc(rec->ca_chain.size);
-                memcpy(rec->ca_chain.data, sqlite3_column_blob(stmt, 6), rec->ca_chain.size);
-
-                rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
-                rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
-                memcpy(rec->pin_pubkey.data, sqlite3_column_blob(stmt, 7), rec->pin_pubkey.size);
-
-                rec->pin_expiry = sqlite3_column_int64(stmt, 8);
-                rec->next = NULL;
-
+                fill_record(stmt, rec);
                 (*records_len)++;
                 break;
             case SQLITE_DONE:
-                LOG_DEBUG(">>> done\n");
                 ret = *records_len ? PATROL_OK : PATROL_DONE;
                 break;
             default:
-                LOG_ERROR("find_certs: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+                LOG_ERROR("get_certs: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
                           sqlite3_errcode(db), sqlite3_extended_errcode(db));
             }
         } while (r == SQLITE_ROW);
+    }
+
+    sqlite3_reset(stmt);
+    return ret;
+}
+
+PatrolRC
+PATROL_get_cert (const char *host, size_t host_len,
+                 const char *proto, size_t proto_len, uint16_t port,
+                 uint64_t cert_id, PatrolRecord *record)
+{
+    if (!db) {
+        PATROL_db_open();
+        if (!db)
+            return PATROL_ERROR;
+    }
+
+    static sqlite3_stmt *stmt = NULL;
+    if (!stmt) {
+        sqlite3_prepare_v2(
+            db,
+            C2ARG("SELECT cert_id, status, first_seen, last_seen, count_seen, "
+                  "       cert, ca_chain, pin_pubkey, pin_expiry "
+                  "FROM peers "
+                  "INNER JOIN certs ON cert_id = id "
+                  "WHERE cert_id = ? AND port = ? AND proto = ? AND host = ? "),
+            &stmt, NULL);
+    }
+
+    int ret = PATROL_ERROR;
+
+    if (sqlite3_bind_int64(stmt, 1, cert_id) != SQLITE_OK ||
+        sqlite3_bind_int(stmt, 2, port) != SQLITE_OK ||
+        sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
+        sqlite3_bind_text(stmt, 4, host, host_len, SQLITE_STATIC) != SQLITE_OK) {
+
+	LOG_ERROR("get_cert: bind: %s (#%d)\n",
+                  sqlite3_errmsg(db), sqlite3_errcode(db));
+    } else {
+        switch (sqlite3_step(stmt)) {
+        case SQLITE_ROW:
+            fill_record(stmt, record);
+            ret = PATROL_OK;
+            break;
+        case SQLITE_DONE:
+            ret = PATROL_DONE;
+            break;
+        default:
+            LOG_ERROR("get_cert: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+                      sqlite3_errcode(db), sqlite3_extended_errcode(db));
+        }
     }
 
     sqlite3_reset(stmt);
@@ -215,8 +292,8 @@ PATROL_add_cert (const char *host, size_t host_len,
     if (!chain_len)
         return PATROL_ERROR;
 
-    static sqlite3_stmt *stmt_sel_cert = NULL, *stmt_begin = NULL, *stmt_ins_cert = NULL,
-                        *stmt_ins_peer = NULL, *stmt_commit = NULL, *stmt_rollback = NULL;
+    static sqlite3_stmt *stmt_begin = NULL, *stmt_commit = NULL, *stmt_rollback = NULL,
+        *stmt_sel_cert = NULL, *stmt_ins_cert = NULL, *stmt_ins_peer = NULL;
     if (!stmt_sel_cert)
         sqlite3_prepare_v2(
             db,
@@ -234,7 +311,7 @@ PATROL_add_cert (const char *host, size_t host_len,
         sqlite3_prepare_v2(
             db,
             C2ARG("INSERT INTO peers (host, proto, port, status, cert_id) "
-                  "VALUES (?, ?, ?, ?, last_insert_rowid())"),
+                  "VALUES (?, ?, ?, ?, ?)"),
             &stmt_ins_peer, NULL);
     if (!stmt_commit)
         sqlite3_prepare_v2(db, C2ARG("COMMIT"), &stmt_commit, NULL);
@@ -242,7 +319,7 @@ PATROL_add_cert (const char *host, size_t host_len,
         sqlite3_prepare_v2(db, C2ARG("ROLLBACK"), &stmt_rollback, NULL);
 
     PatrolRC ret = PATROL_ERROR;
-    char *ca_chain = NULL;
+    unsigned char *ca_chain = NULL;
     size_t i, ca_chain_len = 0;
     *cert_id = -1;
 
@@ -283,6 +360,11 @@ PATROL_add_cert (const char *host, size_t host_len,
     }
 
     if (*cert_id < 0) {
+        if (chain_len > 1) {
+            ca_chain = chain[1].data;
+            ca_chain_len = chain[1].size;
+        }
+/* FIXME
         // construct a DER-encoded buffer of CA certificates
 
         for (i = 1; i < chain_len; i++)
@@ -292,6 +374,7 @@ PATROL_add_cert (const char *host, size_t host_len,
 
         for (i = 1; i < chain_len; i++)
             memcpy(ca_chain, chain[i].data, chain[i].size);
+*/
 
         if (sqlite3_bind_blob(stmt_ins_cert, 1, chain[0].data, chain[0].size, SQLITE_STATIC) != SQLITE_OK ||
             sqlite3_bind_blob(stmt_ins_cert, 2, ca_chain, ca_chain_len, SQLITE_STATIC) != SQLITE_OK ||
@@ -320,9 +403,11 @@ PATROL_add_cert (const char *host, size_t host_len,
     if (sqlite3_bind_text(stmt_ins_peer, 1, host, host_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_text(stmt_ins_peer, 2, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt_ins_peer, 3, port) != SQLITE_OK ||
-        sqlite3_bind_int(stmt_ins_peer, 4, status) != SQLITE_OK) {
+        sqlite3_bind_int(stmt_ins_peer, 4, status) != SQLITE_OK ||
+        sqlite3_bind_int64(stmt_ins_peer, 5, *cert_id) != SQLITE_OK) {
 
-        LOG_ERROR("add_cert: ins bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+        LOG_ERROR("add_cert: ins bind: %s (#%d)\n",
+                  sqlite3_errmsg(db), sqlite3_errcode(db));
         goto add_cert_end;
     }
 
@@ -451,7 +536,8 @@ PATROL_set_cert_active (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 4, port) != SQLITE_OK) {
 
-	LOG_ERROR("activate_cert: bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+	LOG_ERROR("activate_cert: bind: %s (#%d)\n",
+                  sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
 	case SQLITE_DONE:
@@ -497,7 +583,8 @@ PATROL_set_cert_seen (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 4, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_cert_seen: bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+	LOG_ERROR("set_cert_seen: bind: %s (#%d)\n",
+                  sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
 	case SQLITE_DONE:
@@ -551,7 +638,8 @@ PATROL_set_pin (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 6, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 7, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_pin_pubkey: bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+	LOG_ERROR("set_pin_pubkey: bind: %s (#%d)\n",
+                  sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
 	case SQLITE_DONE:

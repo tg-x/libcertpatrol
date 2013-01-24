@@ -70,7 +70,7 @@ set(GCR_LIBRARIES ${PKG_GCR_LIBRARIES} CACHE STRING
     "Gcr libraries")
 
 include_directories(
-    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
     ${GNUTLS_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
@@ -151,7 +151,7 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
 set(CMAKE_BINARY_DIR .CMakeFiles)
 
-configure_file(config.h.in config.h)
+configure_file(src/config.h.in src/config.h)
 
 include(FindDoxygen)
 add_custom_target(doc ${DOXYGEN_EXECUTABLE})

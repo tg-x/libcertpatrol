@@ -38,19 +38,19 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
     static const char *new_cmd = NULL, *change_cmd = NULL;
     static PatrolPinLevel pin_level = PATROL_PIN_END_ENTITY;
     if (new_notify < 0) {
-        char *buf = getenv("PATROL_NEW_NOTIFY");
+        char *buf = getenv("CERTPATROL_NEW_NOTIFY");
         new_notify = buf && buf[0] == '1' && buf[1] == '\0';
-        new_cmd = getenv("PATROL_NEW_CMD");
+        new_cmd = getenv("CERTPATROL_NEW_CMD");
         if (new_cmd && new_cmd[0] == '\0')
             new_cmd = NULL;
 
-        buf = getenv("PATROL_CHANGE_NOTIFY");
+        buf = getenv("CERTPATROL_CHANGE_NOTIFY");
         change_notify = buf && buf[0] == '1' && buf[1] == '\0';
-        change_cmd = getenv("PATROL_CHANGE_CMD");
+        change_cmd = getenv("CERTPATROL_CHANGE_CMD");
         if (change_cmd && change_cmd[0] == '\0')
             change_cmd = NULL;
 
-        buf = getenv("PATROL_PIN_LEVEL");
+        buf = getenv("CERTPATROL_PIN_LEVEL");
         if (buf && buf[0] != '\0')
             pin_level = atoi(buf);
     }

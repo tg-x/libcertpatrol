@@ -47,15 +47,25 @@ typedef gnutls_datum_t PatrolData;
 typedef struct PatrolRecord PatrolRecord;
 
 struct PatrolRecord {
-    int64_t id;			///< ID of peer certificate.
-    PatrolStatus status;	///< Certificate status.
-    int64_t first_seen;		///< Timestamp when the certificate was first seen for this peer.
-    int64_t last_seen;		///< Timestamp when the certificate was last seen for this peer.
-    int64_t count_seen;		///< Number of times the certificate was seen for this peer.
-    PatrolData cert;		///< DER-encoded end entity certificate.
-    PatrolData ca_chain;	///< DER-encoded CA chain.
-    PatrolData pin_pubkey;	///< Pinned public key.
-    int64_t pin_expiry;		///< Expiry of pin.
+    /// ID of peer certificate.
+    int64_t id;
+    /// Certificate status.
+    PatrolStatus status;
+    /// Timestamp when the certificate was first seen for this peer.
+    int64_t first_seen;
+    /// Timestamp when the certificate was last seen for this peer.
+    int64_t last_seen;
+    /// Number of times the certificate was seen for this peer.
+    int64_t count_seen;
+    /// DER-encoded certificate chain.
+    PatrolData *chain;
+    /// Length of certificate chain.
+    size_t chain_len;
+    /// Pinned public key.
+    PatrolData pin_pubkey;
+    /// Expiry of pin.
+    int64_t pin_expiry;
+    /// Next record.
     PatrolRecord *next;
 };
 
@@ -85,6 +95,11 @@ PATROL_get_certs (const char *host, size_t host_len,
                   const char *proto, size_t proto_len, uint16_t port,
                   PatrolStatus status, bool wildcard,
                   PatrolRecord **records, size_t *records_len);
+
+PatrolRC
+PATROL_get_cert (const char *host, size_t host_len,
+                 const char *proto, size_t proto_len, uint16_t port,
+                 uint64_t cert_id, PatrolRecord *record);
 
 PatrolRC
 PATROL_add_cert (const char *host, size_t host_len,

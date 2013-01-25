@@ -253,10 +253,12 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
     gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
     g_signal_connect(tree_view, "focus-in-event", G_CALLBACK(on_tree_view_focus), self);
 
-    GtkTreeSelection *tree_selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
-    g_signal_connect(tree_selection, "changed", G_CALLBACK(on_tree_selection_changed), self);
+    GtkTreeSelection *tree_sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
+    g_signal_connect(tree_sel, "changed", G_CALLBACK(on_tree_selection_changed), self);
     gtk_box_pack_start(GTK_BOX(container), tree_view, FALSE, FALSE, 0);
     gtk_widget_show(tree_view);
+    if (idx == 0) // new chain
+        gtk_tree_selection_select_iter(tree_sel, &iter);
 
     /* first column */
     GtkCellRenderer *tree_renderer = gtk_cell_renderer_text_new();

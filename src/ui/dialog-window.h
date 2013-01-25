@@ -37,4 +37,8 @@ PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
                           guint16 port, GList *chain_list);
 
+void
+patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
+                           const gchar *proto, guint16 port, GList *chains);
+
 #endif

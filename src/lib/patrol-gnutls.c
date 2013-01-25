@@ -90,7 +90,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             }
 
             PatrolData pubkey_der;
-#if GNUTLS_CHECK_VERSION(3, 1, 3)
+#if GNUTLS_CHECK_VERSION(3,1,3)
             r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER,
                                       (gnutls_datum_t *) &pubkey_der);
 #else
@@ -106,7 +106,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             }
 
             time_t expiration = 0;
-#if GNUTLS_CHECK_VERSION(3, 1, 6)
+#if GNUTLS_CHECK_VERSION(3,1,6)
             time_t activation = 0;
             unsigned int critical;
             gnutls_x509_crt_get_private_key_usage_period(crt, &activation,
@@ -170,7 +170,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                 return PATROL_ERROR;
             }
 
-#if GNUTLS_CHECK_VERSION(3, 1, 3)
+#if GNUTLS_CHECK_VERSION(3,1,3)
             r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER,
                                       (gnutls_datum_t *) &pubkey_list[i]);
 #else

@@ -320,7 +320,7 @@ PATROL_add_cert (const char *host, size_t host_len,
 
     PatrolRC ret = PATROL_ERROR;
     unsigned char *ca_chain = NULL;
-    size_t i, ca_chain_len = 0;
+    size_t ca_chain_len = 0;
     *cert_id = -1;
 
     if (sqlite3_bind_blob(stmt_sel_cert, 1, chain[0].data, chain[0].size,

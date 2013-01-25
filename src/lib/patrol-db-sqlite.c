@@ -46,7 +46,7 @@ PATROL_db_open()
     int ret = sqlite3_open(path, &db);
 
     if (ret != SQLITE_OK) {
-        LOG_ERROR("Can't open database: %s", sqlite3_errmsg(db));
+        LOG_ERROR("Can't open database %s: %s", path, sqlite3_errmsg(db));
         sqlite3_close(db);
         return PATROL_ERROR;
     }

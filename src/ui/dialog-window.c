@@ -41,6 +41,8 @@ enum {
     COLS_NUM,
 };
 
+static GtkTreeSelection *cur_sel = NULL;
+
 static guint signals[SIGNALS_NUM];
 
 G_DEFINE_TYPE(PatrolDialogWindow, patrol_dialog_window, GTK_TYPE_WINDOW);
@@ -171,33 +173,43 @@ patrol_dialog_window_constructed (GObject *obj)
     gtk_widget_show_all(bbox);
 }
 
+static void
+on_cert_changed (GcrCertificateRenderer *renderer, gpointer arg) {
+    GtkTreeView *tree_view = GTK_TREE_VIEW(arg);
+    GtkTreeSelection *tree_sel = gtk_tree_view_get_selection(tree_view);
+    if (tree_sel != cur_sel)
+        gtk_tree_selection_unselect_all(tree_sel);
+}
+
 static gboolean
-on_tree_view_focus (GtkWidget *tree_view, GtkDirectionType direction, gpointer arg) {
+on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg) {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
     GcrCertificate *cert;
-    GtkTreeSelection *tree_selection;
     GtkTreeIter iter;
     GtkTreeModel *tree_model;
+    GtkTreeSelection *tree_sel = gtk_tree_view_get_selection(tree_view);
 
-    tree_selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
-
-    if (gtk_tree_selection_get_selected(tree_selection, &tree_model, &iter)) {
+    if (gtk_tree_selection_get_selected(tree_sel, &tree_model, &iter)) {
         gtk_tree_model_get(tree_model, &iter, COL_CERT, &cert, -1);
+        cur_sel = tree_sel;
         gcr_certificate_renderer_set_certificate(self->pv->renderer, cert);
+        cur_sel = NULL;
     }
     return FALSE;
 }
 
 static void
-on_tree_selection_changed (GtkTreeSelection *tree_selection, gpointer arg) {
+on_tree_selection_changed (GtkTreeSelection *tree_sel, gpointer arg) {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
     GcrCertificate *cert;
     GtkTreeIter iter;
     GtkTreeModel *tree_model;
 
-    if (gtk_tree_selection_get_selected(tree_selection, &tree_model, &iter)) {
+    if (gtk_tree_selection_get_selected(tree_sel, &tree_model, &iter)) {
         gtk_tree_model_get(tree_model, &iter, COL_CERT, &cert, -1);
+        cur_sel = tree_sel;
         gcr_certificate_renderer_set_certificate(self->pv->renderer, cert);
+        cur_sel = NULL;
     }
 }
 
@@ -251,7 +263,10 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
     /* build tree viewer */
     GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
     gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
-    g_signal_connect(tree_view, "focus-in-event", G_CALLBACK(on_tree_view_focus), self);
+    g_signal_connect(tree_view, "focus-in-event",
+                     G_CALLBACK(on_tree_view_focus), self);
+    g_signal_connect(self->pv->renderer, "data-changed",
+                     G_CALLBACK(on_cert_changed), tree_view);
 
     GtkTreeSelection *tree_sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
     g_signal_connect(tree_sel, "changed", G_CALLBACK(on_tree_selection_changed), self);

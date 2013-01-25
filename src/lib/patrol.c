@@ -44,7 +44,7 @@ PATROL_get_peer_addr (int fd, int *proto,
         break;
     }
 #endif
-    LOG_DEBUG(">> proto: %d, %s\n", *proto, protoname);
+    LOG_DEBUG(">> proto: %d, %s", *proto, protoname);
 
     struct sockaddr addr;
     socklen_t addrlen = sizeof(struct sockaddr);
@@ -78,8 +78,7 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
         char id[21], prt[6];
         snprintf(prt, 6, "%u", port);
         snprintf(id, 21, "%" PRId64, cert_id);
-        LOG_DEBUG(">> exec_cmd: %s %s %s %s %s\n",
-                  cmd, host, proto, prt, id);
+        LOG_DEBUG(">> exec_cmd: %s %s %s %s %s", cmd, host, proto, prt, id);
         execlp(cmd, cmd, host, proto, prt, id, NULL);
         perror("exec");
         _exit(-1);
@@ -88,7 +87,7 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
     if (wait) {
         int ret;
         waitpid(pid, &ret, 0);
-        LOG_DEBUG(">>> cmd returned %d\n", ret);
+        LOG_DEBUG(">>> cmd returned %d", ret);
         return ret;
     } else {
         return PATROL_CMD_ACCEPT;

@@ -27,7 +27,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                       const char *proto, size_t proto_len,
                       uint16_t port)
 {
-    LOG_DEBUG(">> verify: %zu, %s, %s, %s, %d\n", chain_len, host, addr, proto, port);
+    LOG_DEBUG(">> verify: %zu, %s, %s, %s, %d", chain_len, host, addr, proto, port);
 
     const char *name = host_len ? host : addr;
     size_t name_len = host_len ? host_len : addr_len;
@@ -78,14 +78,14 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             r = gnutls_x509_crt_import(crt, (gnutls_datum_t *) &chain[i],
                                        GNUTLS_X509_FMT_DER);
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error importing cert #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error importing cert #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
             gnutls_pubkey_init(&pubkey);
             r = gnutls_pubkey_import_x509(pubkey, crt, 0);
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error importing pubkey #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error importing pubkey #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
@@ -101,7 +101,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                                      (size_t *) &(pubkey_der.size));
 #endif
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error exporting pubkey #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error exporting pubkey #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
@@ -115,7 +115,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             if (0 >= PATROL_set_pin(name, name_len, proto, proto_len,
                                     port, cert_id, pubkey_der.data,
                                     pubkey_der.size, expiration)) {
-                LOG_DEBUG(">>> error pinning pubkey\n");
+                LOG_DEBUG(">>> error pinning pubkey");
                 return PATROL_ERROR;
             }
 
@@ -132,7 +132,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
         break;
 
     default:
-        LOG_DEBUG(">>> error adding cert\n");
+        LOG_DEBUG(">>> error adding cert");
         return PATROL_ERROR;
     }
 
@@ -140,14 +140,14 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                              PATROL_STATUS_ACTIVE, false,
                              &records, &records_len)) {
     case PATROL_DONE: // no active certs found for peer
-        LOG_DEBUG(">>> new cert\n");
+        LOG_DEBUG(">>> new cert");
 
         cmd = new_cmd;
         notify = new_notify;
         break;
 
     case PATROL_OK: // active cert(s) found for peer
-        LOG_DEBUG(">>> cert found\n");
+        LOG_DEBUG(">>> cert found");
 
         // make a list of pubkeys present in the chain
         size_t pubkey_list_len = chain_len;
@@ -159,14 +159,14 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             r = gnutls_x509_crt_import(crt, (gnutls_datum_t *) &chain[i],
                                        GNUTLS_X509_FMT_DER);
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error importing cert #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error importing cert #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
             gnutls_pubkey_init(&pubkey);
             r = gnutls_pubkey_import_x509(pubkey, crt, 0);
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error importing pubkey #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error importing pubkey #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
@@ -181,7 +181,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                                      (size_t *) &(pubkey_list[i].size));
 #endif
             if (r != GNUTLS_E_SUCCESS) {
-                LOG_DEBUG(">>> error exporting pubkey #%d: %d\n", i, r);
+                LOG_DEBUG(">>> error exporting pubkey #%d: %d", i, r);
                 return PATROL_ERROR;
             }
 
@@ -196,7 +196,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                 continue;
 
             for (i = 0; i < pubkey_list_len; i++) {
-                LOG_DEBUG("%u vs %u\n", pubkey_list[i].size, rec->pin_pubkey.size);
+                LOG_DEBUG("%u vs %u", pubkey_list[i].size, rec->pin_pubkey.size);
                 if (pubkey_list[i].size == rec->pin_pubkey.size
                     && 0 == memcmp(pubkey_list[i].data, rec->pin_pubkey.data,
                                    pubkey_list[i].size)) {
@@ -215,7 +215,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
         break;
 
     default:
-        LOG_DEBUG(">>> get_certs error\n");
+        LOG_DEBUG(">>> get_certs error");
         return PATROL_ERROR;
     }
 

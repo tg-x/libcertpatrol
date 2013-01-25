@@ -48,7 +48,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
                                   const char* hostname,
                                   unsigned int * status)
 {
-    LOG_DEBUG(">> gnutls_certificate_verify_peers3\n");
+    LOG_DEBUG(">> gnutls_certificate_verify_peers3");
     static int (*verify_peers3)(gnutls_session_t, const char* hostname,
                                 unsigned int *status) = NULL;
     if (!verify_peers3)
@@ -57,7 +57,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
         return GNUTLS_E_CERTIFICATE_ERROR;
 
     int ret = verify_peers3(session, hostname, status);
-    LOG_DEBUG(">>> result = %d, %d\n", ret, *status);
+    LOG_DEBUG(">>> result = %d, %d", ret, *status);
 
     int fd = (int)(intptr_t) gnutls_transport_get_ptr(session);
 
@@ -77,7 +77,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> patrol result = %d\n", pret);
+    LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK
         ? GNUTLS_E_SUCCESS
@@ -94,7 +94,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
 int
 gnutls_certificate_verify_peers2 (gnutls_session_t session,
                                   unsigned int *status) {
-    LOG_DEBUG(">> gnutls_certificate_verify_peers2\n");
+    LOG_DEBUG(">> gnutls_certificate_verify_peers2");
     static int (*verify_peers2)(gnutls_session_t, unsigned int *status) = NULL;
     if (!verify_peers2)
         verify_peers2 = getfunc("gnutls_certificate_verify_peers2", LIBGNUTLS);
@@ -102,7 +102,7 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
         return GNUTLS_E_CERTIFICATE_ERROR;
 
     int ret = verify_peers2(session, status);
-    LOG_DEBUG(">>> result = %d, %d\n", ret, *status);
+    LOG_DEBUG(">>> result = %d, %d", ret, *status);
 
     char hostname[MAX_SERVER_NAME_SIZE+1] = "";
     unsigned int hostlen = 0;
@@ -122,7 +122,7 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
                 memcpy(hostname, priv->server_names[0].name,
                        priv->server_names[0].name_length);
                 hostname[hostlen] = '\0';
-                LOG_DEBUG(">>> hostname = %s\n", hostname);
+                LOG_DEBUG(">>> hostname = %s", hostname);
             }
         }
     }
@@ -145,7 +145,7 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> patrol result = %d\n", pret);
+    LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK
         ? GNUTLS_E_SUCCESS
@@ -161,7 +161,7 @@ int
 gnutls_x509_crt_check_hostname (gnutls_x509_crt_t cert,
                                 const char *hostname)
 {
-    LOG_DEBUG(">> gnutls_x509_crt_check_hostname: %s\n", hostname);
+    LOG_DEBUG(">> gnutls_x509_crt_check_hostname: %s", hostname);
     static int (*check_hostname)(gnutls_x509_crt_t cert,
                                  const char *hostname) = NULL;
     if (!check_hostname)
@@ -170,7 +170,7 @@ gnutls_x509_crt_check_hostname (gnutls_x509_crt_t cert,
         return 0;
 
     int ret = check_hostname(cert, hostname);
-    LOG_DEBUG(">>> result = %d\n", ret);
+    LOG_DEBUG(">>> result = %d", ret);
     return ret;
 }
 #endif

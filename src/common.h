@@ -5,7 +5,11 @@
 
 #define C2ARG(str)  str, sizeof(str)-1
 
-#define LOG_ERROR(fmt, ...) fprintf(stderr, "[CertPatrol] " fmt, ##__VA_ARGS__)
+#ifndef LOG_TARGET
+# define LOG_TARGET "CertPatrol"
+#endif
+
+#define LOG_ERROR(fmt, ...) fprintf(stderr, "[" LOG_TARGET "] " fmt "\n", ##__VA_ARGS__)
 
 #ifdef DEBUG
 # define LOG_DEBUG LOG_ERROR

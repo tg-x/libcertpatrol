@@ -12,7 +12,7 @@ static PRFileDesc *nss_fd = NULL;
 SECStatus
 SSL_SetURL(PRFileDesc *fd, char *url)
 {
-    LOG_DEBUG(">> SSL_SetURL: %s\n", url);
+    LOG_DEBUG(">> SSL_SetURL: %s", url);
     static int (*SetUrl)(PRFileDesc *fd, char *url) = NULL;
     if (!SetUrl)
         SetUrl = getfunc("SSL_SetURL", LIBSSL3);
@@ -20,7 +20,7 @@ SSL_SetURL(PRFileDesc *fd, char *url)
         return SECFailure;
 
     int ret = SetUrl(fd, url);
-    LOG_DEBUG(">>> result = %d\n", ret);
+    LOG_DEBUG(">>> result = %d", ret);
     nss_fd = fd;
     return ret;
 }
@@ -31,7 +31,7 @@ SSL_SetURL(PRFileDesc *fd, char *url)
 SECStatus
 CERT_VerifyCertName(CERTCertificate *cert, const char *hostname)
 {
-    LOG_DEBUG(">> CERT_VerifyCertName: %s\n", hostname);
+    LOG_DEBUG(">> CERT_VerifyCertName: %s", hostname);
     static SECStatus (*VerifyCertName)(CERTCertificate *cert,
                                        const char *hostname) = NULL;
     if (!VerifyCertName)
@@ -40,6 +40,6 @@ CERT_VerifyCertName(CERTCertificate *cert, const char *hostname)
         return SECFailure;
 
     SECStatus ret = VerifyCertName(cert, hostname);
-    LOG_DEBUG(">>> result = %d\n", ret);
+    LOG_DEBUG(">>> result = %d", ret);
     return ret;
 }

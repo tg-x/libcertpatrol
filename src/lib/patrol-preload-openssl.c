@@ -18,7 +18,7 @@
 long
 SSL_get_verify_result (const SSL *ssl)
 {
-    LOG_DEBUG(">> SSL_get_verify_result: 0x%lx\n", (unsigned long)ssl);
+    LOG_DEBUG(">> SSL_get_verify_result: 0x%lx", (unsigned long)ssl);
     static int (*get_verify_result)(const SSL *ssl) = NULL;
     if (!get_verify_result)
         get_verify_result = getfunc("SSL_get_verify_result", LIBSSL);
@@ -27,7 +27,7 @@ SSL_get_verify_result (const SSL *ssl)
 
     /* Get OpenSSL's verify result */
     int ret = get_verify_result(ssl);
-    LOG_DEBUG(">>> result = %d\n", ret);
+    LOG_DEBUG(">>> result = %d", ret);
 
     BIO *bio = SSL_get_rbio(ssl);
     int fd = BIO_get_fd(bio, NULL);
@@ -49,7 +49,7 @@ SSL_get_verify_result (const SSL *ssl)
                                      hostname, strlen(hostname),
                                      addr, strlen(addr),
                                      protoname, strlen(protoname), port);
-    LOG_DEBUG(">>> patrol result = %d\n", pret);
+    LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK ? X509_V_OK : X509_V_ERR_CERT_UNTRUSTED;
 }
@@ -62,7 +62,7 @@ SSL_get_verify_result (const SSL *ssl)
 int
 SSL_connect (SSL *s)
 {
-    LOG_DEBUG(">> SSL_connect: 0x%lx\n", (unsigned long)s);
+    LOG_DEBUG(">> SSL_connect: 0x%lx", (unsigned long)s);
     static int (*ssl_connect)(SSL *s) = NULL;
     if (!ssl_connect)
         ssl_connect = getfunc("SSL_connect", LIBSSL);

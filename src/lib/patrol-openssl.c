@@ -11,7 +11,7 @@ PATROL_OPENSSL_verify (const STACK_OF(X509) *chain,
                        const char *proto, size_t proto_len,
                        uint16_t port)
 {
-    LOG_DEBUG(">> verify: %d, %s, %s, %s, %d\n",
+    LOG_DEBUG(">> verify: %d, %s, %s, %s, %d",
               chain != NULL, host, addr, proto, port);
 
     PatrolRC ret = PATROL_ERROR;

@@ -18,7 +18,7 @@ static sqlite3 *db;
 static void
 db_trace (void *arg, const char *sql)
 {
-    LOG_DEBUG("[DB] %s\n", sql);
+    LOG_DEBUG("[DB] %s", sql);
 }
 #endif
 
@@ -40,13 +40,13 @@ PATROL_db_open()
         free(dir);
     }
 
-    LOG_DEBUG(">>> db_open: %s\n", path);
+    LOG_DEBUG(">>> db_open: %s", path);
 
     sqlite3_enable_shared_cache(1);
     int ret = sqlite3_open(path, &db);
 
     if (ret != SQLITE_OK) {
-        LOG_ERROR("Can't open database: %s\n", sqlite3_errmsg(db));
+        LOG_ERROR("Can't open database: %s", sqlite3_errmsg(db));
         sqlite3_close(db);
         return PATROL_ERROR;
     }
@@ -80,7 +80,7 @@ PATROL_db_open()
                        ");",
                        NULL, NULL, NULL);
     if (ret != SQLITE_OK) {
-	LOG_ERROR("Error creating tables: %s (#%d)\n", sqlite3_errmsg(db), ret);
+	LOG_ERROR("Error creating tables: %s (#%d)", sqlite3_errmsg(db), ret);
     }
 
     ret = sqlite3_exec(db,
@@ -89,7 +89,7 @@ PATROL_db_open()
                        "INSERT OR IGNORE INTO status VALUES( 1, 'active');",
                        NULL, NULL, NULL);
     if (ret != SQLITE_OK) {
-	LOG_ERROR("Error inserting values: %s (#%d)\n", sqlite3_errmsg(db), ret);
+	LOG_ERROR("Error inserting values: %s (#%d)", sqlite3_errmsg(db), ret);
     }
 
     return PATROL_OK;
@@ -192,7 +192,7 @@ PATROL_get_certs (const char *host, size_t host_len,
          sqlite3_bind_text(stmt, 5, host_wild, host_len - (host_wild - host),
                            SQLITE_STATIC) != SQLITE_OK)) {
 
-	LOG_ERROR("get_certs: bind: %s (#%d)\n",
+	LOG_ERROR("get_certs: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
         PatrolRecord *rec = NULL;
@@ -215,7 +215,7 @@ PATROL_get_certs (const char *host, size_t host_len,
                 ret = *records_len ? PATROL_OK : PATROL_DONE;
                 break;
             default:
-                LOG_ERROR("get_certs: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+                LOG_ERROR("get_certs: step: %s (#%d/%d)", sqlite3_errmsg(db),
                           sqlite3_errcode(db), sqlite3_extended_errcode(db));
             }
         } while (r == SQLITE_ROW);
@@ -255,7 +255,7 @@ PATROL_get_cert (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_text(stmt, 4, host, host_len, SQLITE_STATIC) != SQLITE_OK) {
 
-	LOG_ERROR("get_cert: bind: %s (#%d)\n",
+	LOG_ERROR("get_cert: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
         switch (sqlite3_step(stmt)) {
@@ -267,7 +267,7 @@ PATROL_get_cert (const char *host, size_t host_len,
             ret = PATROL_DONE;
             break;
         default:
-            LOG_ERROR("get_cert: step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+            LOG_ERROR("get_cert: step: %s (#%d/%d)", sqlite3_errmsg(db),
                       sqlite3_errcode(db), sqlite3_extended_errcode(db));
         }
     }
@@ -325,7 +325,7 @@ PATROL_add_cert (const char *host, size_t host_len,
 
     if (sqlite3_bind_blob(stmt_sel_cert, 1, chain[0].data, chain[0].size,
                           SQLITE_STATIC) != SQLITE_OK) {
-        LOG_ERROR("add_cert: sel bind: %s (#%d)\n",
+        LOG_ERROR("add_cert: sel bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
         switch (sqlite3_step(stmt_sel_cert)) {
@@ -338,7 +338,7 @@ PATROL_add_cert (const char *host, size_t host_len,
             break;
         case SQLITE_BUSY:
         default:
-            LOG_ERROR("add_cert: sel step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+            LOG_ERROR("add_cert: sel step: %s (#%d/%d)", sqlite3_errmsg(db),
                       sqlite3_errcode(db), sqlite3_extended_errcode(db));
         }
     }
@@ -354,7 +354,7 @@ PATROL_add_cert (const char *host, size_t host_len,
         break;
     case SQLITE_BUSY:
     default:
-        LOG_ERROR("add_cert: begin step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+        LOG_ERROR("add_cert: begin step: %s (#%d/%d)", sqlite3_errmsg(db),
                   sqlite3_errcode(db), sqlite3_extended_errcode(db));
         goto add_cert_end;
     }
@@ -381,7 +381,7 @@ PATROL_add_cert (const char *host, size_t host_len,
             sqlite3_bind_blob(stmt_ins_cert, 3, pin_pubkey, pin_pubkey_len, SQLITE_STATIC) != SQLITE_OK ||
             sqlite3_bind_int64(stmt_ins_cert, 4, pin_expiry) != SQLITE_OK) {
 
-            LOG_ERROR("add_cert: ins cert bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+            LOG_ERROR("add_cert: ins cert bind: %s (#%d)", sqlite3_errmsg(db), sqlite3_errcode(db));
             goto add_cert_end;
         }
 
@@ -389,12 +389,12 @@ PATROL_add_cert (const char *host, size_t host_len,
         case SQLITE_DONE:
             if (cert_id)
                 *cert_id = sqlite3_last_insert_rowid(db);
-            LOG_DEBUG(">>> cert_id = %" PRId64 "\n", *cert_id);
+            LOG_DEBUG(">>> cert_id = %" PRId64 "", *cert_id);
             break;
         case SQLITE_BUSY:
             // TODO retry
         default:
-            LOG_ERROR("add_cert: cert step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+            LOG_ERROR("add_cert: cert step: %s (#%d/%d)", sqlite3_errmsg(db),
                       sqlite3_errcode(db), sqlite3_extended_errcode(db));
             goto add_cert_end;
         }
@@ -406,7 +406,7 @@ PATROL_add_cert (const char *host, size_t host_len,
         sqlite3_bind_int(stmt_ins_peer, 4, status) != SQLITE_OK ||
         sqlite3_bind_int64(stmt_ins_peer, 5, *cert_id) != SQLITE_OK) {
 
-        LOG_ERROR("add_cert: ins bind: %s (#%d)\n",
+        LOG_ERROR("add_cert: ins bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
         goto add_cert_end;
     }
@@ -423,7 +423,7 @@ PATROL_add_cert (const char *host, size_t host_len,
     case SQLITE_BUSY:
         // TODO retry
     default:
-        LOG_ERROR("add_cert: peer step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+        LOG_ERROR("add_cert: peer step: %s (#%d/%d)", sqlite3_errmsg(db),
                   sqlite3_errcode(db), sqlite3_extended_errcode(db));
         goto add_cert_end;
     }
@@ -434,7 +434,7 @@ PATROL_add_cert (const char *host, size_t host_len,
         break;
     case SQLITE_BUSY:
     default:
-        LOG_ERROR("add_cert: commit step: %s (#%d/%d)\n", sqlite3_errmsg(db),
+        LOG_ERROR("add_cert: commit step: %s (#%d/%d)", sqlite3_errmsg(db),
                   sqlite3_errcode(db), sqlite3_extended_errcode(db));
         goto add_cert_end;
     }
@@ -480,7 +480,7 @@ PATROL_set_cert_status (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 4, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 5, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_cert_status bind: %s (#%d)\n", sqlite3_errmsg(db), sqlite3_errcode(db));
+	LOG_ERROR("set_cert_status bind: %s (#%d)", sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
 	case SQLITE_DONE:
@@ -489,7 +489,7 @@ PATROL_set_cert_status (const char *host, size_t host_len,
         case SQLITE_BUSY:
             // TODO retry
 	default:
-	    LOG_ERROR("set_cert_status_step: %s (#%d)\n",
+	    LOG_ERROR("set_cert_status_step: %s (#%d)",
 		      sqlite3_errmsg(db), sqlite3_errcode(db));
 	}
     }
@@ -536,7 +536,7 @@ PATROL_set_cert_active (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 4, port) != SQLITE_OK) {
 
-	LOG_ERROR("activate_cert: bind: %s (#%d)\n",
+	LOG_ERROR("activate_cert: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
@@ -546,7 +546,7 @@ PATROL_set_cert_active (const char *host, size_t host_len,
         case SQLITE_BUSY:
             // TODO retry
 	default:
-	    LOG_ERROR("activate_cert: step: %s (#%d)\n",
+	    LOG_ERROR("activate_cert: step: %s (#%d)",
 		      sqlite3_errmsg(db), sqlite3_errcode(db));
 	}
     }
@@ -583,7 +583,7 @@ PATROL_set_cert_seen (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 3, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 4, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_cert_seen: bind: %s (#%d)\n",
+	LOG_ERROR("set_cert_seen: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
@@ -593,7 +593,7 @@ PATROL_set_cert_seen (const char *host, size_t host_len,
         case SQLITE_BUSY:
             // TODO retry
 	default:
-	    LOG_ERROR("set_cert_seen: step: %s (#%d)\n",
+	    LOG_ERROR("set_cert_seen: step: %s (#%d)",
 		      sqlite3_errmsg(db), sqlite3_errcode(db));
 	}
     }
@@ -638,7 +638,7 @@ PATROL_set_pin (const char *host, size_t host_len,
         sqlite3_bind_text(stmt, 6, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 7, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_pin_pubkey: bind: %s (#%d)\n",
+	LOG_ERROR("set_pin_pubkey: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
@@ -648,7 +648,7 @@ PATROL_set_pin (const char *host, size_t host_len,
         case SQLITE_BUSY:
             // TODO retry
 	default:
-	    LOG_ERROR("set_pin_pubkey: step: %s (#%d)\n",
+	    LOG_ERROR("set_pin_pubkey: step: %s (#%d)",
 		      sqlite3_errmsg(db), sqlite3_errcode(db));
 	}
     }

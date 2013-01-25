@@ -138,7 +138,7 @@ main (int argc, char *argv[])
 {
     GOptionContext *context;
     GError *error = NULL;
-    char **args;
+    char **args = NULL;
 
     const GOptionEntry options[] = {
         { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,

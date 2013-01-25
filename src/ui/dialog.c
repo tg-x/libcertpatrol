@@ -22,10 +22,11 @@ print_version_and_exit (const gchar *option_name, const gchar *value,
 }
 
 static void
-on_window_destroy (GtkWidget *widget, gpointer arg)
+on_window_close (GtkWidget *widget, gpointer status)
 {
     gtk_widget_hide(widget);
     gtk_main_quit();
+    exit((intptr_t) status);
 }
 
 static void
@@ -209,7 +210,12 @@ main (int argc, char *argv[])
     PatrolDialogWindow *win = patrol_dialog_window_new(host, proto, port, chain_list);
     gtk_widget_show(GTK_WIDGET(win));
 
-    g_signal_connect(win, "destroy", G_CALLBACK(on_window_destroy), NULL);
+    g_signal_connect(win, "accept", G_CALLBACK(on_window_close), (void *) PATROL_CMD_ACCEPT);
+    g_signal_connect(win, "accept-add", G_CALLBACK(on_window_close), (void *) PATROL_CMD_ACCEPT_ADD);
+    g_signal_connect(win, "continue", G_CALLBACK(on_window_close), (void *) PATROL_CMD_CONTINUE);
+    g_signal_connect(win, "reject", G_CALLBACK(on_window_close), (void *) PATROL_CMD_REJECT);
+    g_signal_connect(win, "destroy", G_CALLBACK(on_window_close), (void *) PATROL_CMD_CONTINUE);
+
     gtk_main();
 
     return 0;

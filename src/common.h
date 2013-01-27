@@ -1,7 +1,8 @@
-#ifndef DEBUG_H
-# define DEBUG_H
+#ifndef PATROL_COMMON_H
+# define PATROL_COMMON_H
 
 #include <stdio.h>
+#include "config.h"
 
 #define C2ARG(str)  str, sizeof(str)-1
 
@@ -17,4 +18,4 @@
 # define LOG_DEBUG(...)
 #endif
 
-#endif // DEBUG_H
+#endif

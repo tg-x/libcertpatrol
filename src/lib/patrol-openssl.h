@@ -4,7 +4,7 @@
 #include <openssl/ssl.h>
 
 PatrolRC
-PATROL_OPENSSL_verify (const STACK_OF(X509) *chain,
+PATROL_OPENSSL_verify (const STACK_OF(X509) *chain, PatrolRC chain_result,
                        const char *host, size_t host_len,
                        const char *addr, size_t addr_len,
                        const char *proto, size_t proto_len,

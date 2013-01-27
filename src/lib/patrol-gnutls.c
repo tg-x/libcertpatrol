@@ -11,6 +11,9 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/abstract.h>
 #include <gnutls/x509.h>
+#ifdef HAVE_GNUTLS_DANE
+# include <gnutls/dane.h>
+#endif
 
 #define GNUTLS_CHECK_VERSION(major, minor, patch)                       \
     (GNUTLS_VERSION_MAJOR > major                                       \
@@ -22,6 +25,8 @@
  */
 PatrolRC
 PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
+                      gnutls_certificate_type_t chain_type,
+                      PatrolRC chain_result,
                       const char *host, size_t host_len,
                       const char *addr, size_t addr_len,
                       const char *proto, size_t proto_len,
@@ -37,8 +42,9 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
     static int new_notify = -1, change_notify = -1;
     static const char *new_cmd = NULL, *change_cmd = NULL;
     static PatrolPinLevel pin_level = PATROL_PIN_END_ENTITY;
+    char *buf;
     if (new_notify < 0) {
-        char *buf = getenv("CERTPATROL_NEW_NOTIFY");
+        buf = getenv("CERTPATROL_NEW_NOTIFY");
         new_notify = buf && buf[0] == '1' && buf[1] == '\0';
         new_cmd = getenv("CERTPATROL_NEW_CMD");
         if (new_cmd && new_cmd[0] == '\0')
@@ -54,6 +60,28 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
         if (buf && buf[0] != '\0')
             pin_level = atoi(buf);
     }
+
+#ifdef HAVE_GNUTLS_DANE
+    static dane_state_t dstate = NULL;
+    if (!dstate) {
+        buf = getenv("CERTPATROL_IGNORE_LOCAL_RESOLVER");
+        dane_state_init(&dstate,
+                        (buf && buf[0] == '1' && buf[1] == '\0')
+                        ? DANE_F_IGNORE_LOCAL_RESOLVER
+                        : 0);
+    }
+    dane_verify_status_t dvstatus = 0;
+    int dret = dane_verify_crt(dstate, chain, chain_len, chain_type,
+                               host, proto, port, 0, 0, &dvstatus);
+# ifdef DEBUG
+    gnutls_datum_t dstr;
+    dane_verification_status_print(dvstatus, &dstr, 0);
+    LOG_DEBUG(">>> dane result: %d, %d - %.*s", dret, dvstatus, dstr.size, dstr.data);
+    gnutls_free(dstr.data);
+# endif
+#else
+    int dret = 0, dvstatus = 0;
+#endif // HAVE_GNUTLS_DANE
 
     int r, notify;
     const char *cmd = NULL;
@@ -111,6 +139,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
             unsigned int critical;
             gnutls_x509_crt_get_private_key_usage_period(crt, &activation,
                                                          &expiration, &critical);
+            LOG_DEBUG(">>> private key expiry: %ld", expiration);
 #endif
             if (0 >= PATROL_set_pin(name, name_len, proto, proto_len,
                                     port, cert_id, pubkey_der.data,
@@ -224,7 +253,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
 
     if (ret != PATROL_OK && cmd != NULL) {
         cmd_ret = PATROL_exec_cmd(cmd, host, proto, port,
-                                  cert_id, !notify);
+                                  cert_id, chain_result, dret, dvstatus, !notify);
     }
 
     switch (cmd_ret) {

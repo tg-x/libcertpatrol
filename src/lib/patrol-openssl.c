@@ -5,7 +5,7 @@
 #include <openssl/ssl.h>
 
 PatrolRC
-PATROL_OPENSSL_verify (const STACK_OF(X509) *chain,
+PATROL_OPENSSL_verify (const STACK_OF(X509) *chain, PatrolRC chain_result,
                        const char *host, size_t host_len,
                        const char *addr, size_t addr_len,
                        const char *proto, size_t proto_len,
@@ -28,8 +28,9 @@ PATROL_OPENSSL_verify (const STACK_OF(X509) *chain,
         ch[i].size = r >= 0 ? r : 0;
     }
 
-    ret = PATROL_verify(ch, ch_len, host, host_len,
-                        addr, addr_len, proto, proto_len, port);
+    ret = PATROL_verify(ch, ch_len, chain_result, PATROL_CERT_X509,
+                        host, host_len, addr, addr_len, proto, proto_len,
+                        port);
 
     for (i = 0; i < ch_len; i++)
         OPENSSL_free(ch[i].data);

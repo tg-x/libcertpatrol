@@ -1,4 +1,3 @@
-#include "config.h"
 #include "common.h"
 
 #include "dialog.h"
@@ -138,14 +137,40 @@ main (int argc, char *argv[])
 {
     GOptionContext *context;
     GError *error = NULL;
-    char **args = NULL;
+
+    gchar *host = NULL, *proto = NULL, **args = NULL;
+    guint16 port = 0;
+    gint64 cert_id = -1;
+    gint chain_result = PATROL_ARG_UNKNOWN;
+    gint dane_result = PATROL_ARG_UNKNOWN, dane_status = 0;
 
     const GOptionEntry options[] = {
         { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
           print_version_and_exit, N_("Show the application's version"), NULL },
 
-        { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY,
-          &args, NULL, N_("<hostname> <protocol> <port> <certID>") },
+        { "host", 'H', 0, G_OPTION_ARG_STRING, &host,
+          N_("Hostname of peer"), NULL },
+
+        { "proto", 'p', 0, G_OPTION_ARG_STRING, &proto,
+          N_("Protocol name of peer"), NULL },
+
+        { "port", 'P', 0, G_OPTION_ARG_INT, &port,
+          N_("Port number of peer"), NULL },
+
+        { "id", 'i', 0, G_OPTION_ARG_INT64, &cert_id,
+          N_("ID of new certificate"), NULL },
+
+        { "chain-result", 'c', 0, G_OPTION_ARG_INT, &chain_result,
+          N_("Chain validation result"), NULL },
+
+        { "dane-result", 'd', 0, G_OPTION_ARG_INT, &dane_result,
+          N_("DANE validation result"), NULL },
+
+        { "dane-status", 'D', 0, G_OPTION_ARG_INT, &dane_status,
+          N_("DANE validation status"), NULL },
+
+        { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &args,
+          NULL, NULL },
 
         { NULL },
     };
@@ -176,23 +201,6 @@ main (int argc, char *argv[])
         return 1;
     }
 
-    gchar *host = NULL, *proto = NULL;
-    guint16 port = 0;
-    gint64 cert_id = -1;
-
-    if (args) {
-        host = args[0];
-        if (args[1]) {
-            proto = args[1];
-            if (args[2]) {
-                port = atoi(args[2]);
-                if (args[3]) {
-                    cert_id = atoll(args[3]);
-                }
-            }
-        }
-    }
-
     if (cert_id < 0) {
         printf("%s", g_option_context_get_help(context, TRUE, NULL));
         exit(-1);
@@ -207,7 +215,9 @@ main (int argc, char *argv[])
     if (!chains)
         exit(-1);
 
-    PatrolDialogWindow *win = patrol_dialog_window_new(host, proto, port, chains);
+    PatrolDialogWindow *win
+        = patrol_dialog_window_new(host, proto, port, chains,
+                                   chain_result, dane_result, dane_status);
     gtk_widget_show(GTK_WIDGET(win));
 
     g_signal_connect(win, "accept", G_CALLBACK(on_window_close),

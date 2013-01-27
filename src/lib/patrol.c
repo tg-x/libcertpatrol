@@ -67,7 +67,8 @@ PATROL_get_peer_addr (int fd, int *proto,
 
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
-                 uint16_t port, int64_t cert_id, bool wait)
+                 uint16_t port, int64_t cert_id, int chain_result,
+                 int dane_result, int dane_status, bool wait)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -75,20 +76,30 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
         return PATROL_ERROR;
     }
     if (pid == 0) {
-        char id[21], prt[6];
+        char id[21], prt[6], cres[7], dres[7], dstatus[7];
         snprintf(prt, 6, "%u", port);
+        snprintf(cres, 7, "%d", chain_result);
+        snprintf(dres, 7, "%d", dane_result);
+        snprintf(dstatus, 7, "%d", dane_status);
         snprintf(id, 21, "%" PRId64, cert_id);
-        LOG_DEBUG(">> exec_cmd: %s %s %s %s %s", cmd, host, proto, prt, id);
-        execlp(cmd, cmd, host, proto, prt, id, NULL);
+        LOG_DEBUG(">> exec_cmd: %s --host %s --proto %s --port %s --id %s "
+                  "--chain-result %s --dane-result %s --dane-status %s",
+                  cmd, host, proto, prt, id, cres, dres, dstatus);
+        execlp(cmd, cmd, "--host", host, "--proto", proto, "--port", prt,
+               "--id", id, "--chain-result", cres, "--dane-result", dres,
+               "--dane-status", dstatus, NULL);
         perror("exec");
         _exit(-1);
     }
 
     if (wait) {
-        int ret;
-        waitpid(pid, &ret, 0);
-        LOG_DEBUG(">>> cmd returned %d", ret);
-        return ret;
+        int status = 0;
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            LOG_DEBUG(">>> cmd returned %d", WEXITSTATUS(status));
+            return WEXITSTATUS(status);
+        }
+        return PATROL_ERROR;
     } else {
         return PATROL_CMD_ACCEPT;
     }

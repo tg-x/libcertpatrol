@@ -17,6 +17,7 @@ add_library(certpatrol-gnutls SHARED
 target_link_libraries(certpatrol-gnutls
     certpatrol
     ${GNUTLS_LIBRARIES}
+    ${GNUTLS_DANE_LIBRARIES}
 )
 install(TARGETS certpatrol-gnutls DESTINATION lib)
 
@@ -53,11 +54,11 @@ endif()
 set(SRC patrol-preload-gnutls.c)
 
 if(OPENSSL_LIBRARIES)
-   set (SRC ${SRC} patrol-preload-openssl.c)
+   set(SRC ${SRC} patrol-preload-openssl.c)
 endif()
 
 if(NSS_LIBRARIES)
-   set (SRC ${SRC} patrol-preload-nss.c)
+   set(SRC ${SRC} patrol-preload-nss.c)
 endif()
 
 add_library(certpatrol-preload SHARED ${SRC})

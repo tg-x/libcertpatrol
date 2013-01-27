@@ -36,6 +36,13 @@ typedef enum {
     PATROL_CMD_REJECT = 3,
 } PatrolCmdRC;
 
+typedef enum {
+    PATROL_CERT_UNKNOWN = 0,
+    PATROL_CERT_X509 = 1,
+    PATROL_CERT_OPENPGP = 2,
+    PATROL_CERT_RAW = 3
+} PatrolCertType;
+
 typedef gnutls_datum_t PatrolData;
 
 #define PATROL_DATA(_data, _size)               \
@@ -76,7 +83,8 @@ PATROL_get_peer_addr (int fd, int *proto,
 
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
-                 uint16_t port, int64_t cert_id, bool wait);
+                 uint16_t port, int64_t cert_id, int chain_result,
+                 int dane_result, int dane_status, bool wait);
 
 /** Get stored certificates of a peer.
  *
@@ -139,13 +147,14 @@ PATROL_set_pin (const char *host, size_t host_len,
 static inline
 PatrolRC
 PATROL_verify (const PatrolData *chain, size_t chain_len,
+               PatrolCertType chain_type, PatrolRC chain_result,
                const char *host, size_t host_len,
                const char *addr, size_t addr_len,
                const char *proto, size_t proto_len,
                uint16_t port)
 {
-    return PATROL_GNUTLS_verify((gnutls_datum_t *)chain, chain_len,
-                                host, host_len, addr, addr_len,
+    return PATROL_GNUTLS_verify((gnutls_datum_t *)chain, chain_len, chain_type,
+                                chain_result, host, host_len, addr, addr_len,
                                 proto, proto_len, port);
 }
 

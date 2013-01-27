@@ -35,10 +35,14 @@ patrol_dialog_window_get_type (void);
 
 PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
-                          guint16 port, GList *chain_list);
+                          guint16 port, GList *chains,
+                          gint chain_result, gint dane_result,
+                          gint dane_status);
 
 void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
-                           const gchar *proto, guint16 port, GList *chains);
+                           const gchar *proto, guint16 port, GList *chains,
+                           gint chain_result, gint dane_result,
+                           gint dane_status);
 
 #endif

@@ -12,9 +12,13 @@
 
 #include <sqlite3.h>
 
+#ifdef DEBUG
+//# define DEBUG_DB
+#endif
+
 static sqlite3 *db;
 
-#ifdef DEBUG
+#ifdef DEBUG_DB
 static void
 db_trace (void *arg, const char *sql)
 {
@@ -51,7 +55,7 @@ PATROL_db_open()
         return PATROL_ERROR;
     }
 
-#ifdef DEBUG
+#ifdef DEBUG_DB
     sqlite3_trace(db, db_trace, NULL);
 #endif
 
@@ -114,19 +118,22 @@ fill_record (sqlite3_stmt *stmt, PatrolRecord *rec)
     rec->last_seen = sqlite3_column_int64(stmt, 3);
     rec->count_seen = sqlite3_column_int64(stmt, 4);
 
-    rec->chain_len = 3; // FIXME
+    size_t ca_chain_len = sqlite3_column_bytes(stmt, 6);
+    rec->chain_len = 1 + (ca_chain_len ? 2 : 0); // FIXME
     rec->chain = malloc(rec->chain_len * sizeof(PatrolData));
 
     rec->chain[0].size = sqlite3_column_bytes(stmt, 5);
     rec->chain[0].data = malloc(rec->chain[0].size);
     memcpy(rec->chain[0].data, sqlite3_column_blob(stmt, 5), rec->chain[0].size);
 
-    rec->chain[1].size = sqlite3_column_bytes(stmt, 6);
-    rec->chain[1].data = malloc(rec->chain[1].size);
-    memcpy(rec->chain[1].data, sqlite3_column_blob(stmt, 6),
-           rec->chain[1].size);
+    if (ca_chain_len) {
+        rec->chain[1].size = ca_chain_len;
+        rec->chain[1].data = malloc(rec->chain[1].size);
+        memcpy(rec->chain[1].data, sqlite3_column_blob(stmt, 6),
+               rec->chain[1].size);
 
-    rec->chain[2] = rec->chain[1]; // FIXME
+        rec->chain[2] = rec->chain[1]; // FIXME
+    }
 
     rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
     rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);

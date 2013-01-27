@@ -21,6 +21,7 @@ set(CMAKE_C_FLAGS_RELEASE "-O2" CACHE STRING
 
 include(FindPkgConfig)
 pkg_check_modules(PKG_GNUTLS gnutls REQUIRED)
+pkg_check_modules(PKG_GNUTLS_DANE gnutls-dane)
 pkg_check_modules(PKG_OPENSSL openssl)
 pkg_check_modules(PKG_NSS nss)
 pkg_check_modules(PKG_SQLITE sqlite3 REQUIRED)
@@ -33,6 +34,13 @@ set(GNUTLS_LIBDIR ${PKG_GNUTLS_LIBDIR} CACHE STRING
     "GnuTLS lib dir")
 set(GNUTLS_LIBRARIES ${PKG_GNUTLS_LIBRARIES} CACHE STRING
     "GnuTLS libraries")
+
+set(GNUTLS_DANE_INCLUDE_DIRS ${PKG_GNUTLS_DANE_INCLUDE_DIRS} CACHE STRING
+    "GnuTLS DANE include dirs")
+set(GNUTLS_DANE_LIBDIR ${PKG_GNUTLS_DANE_LIBDIR} CACHE STRING
+    "GnuTLS DANE lib dir")
+set(GNUTLS_DANE_LIBRARIES ${PKG_GNUTLS_DANE_LIBRARIES} CACHE STRING
+    "GnuTLS DANE libraries")
 
 set(OPENSSL_INCLUDE_DIRS ${PKG_OPENSSL_INCLUDE_DIRS} CACHE STRING
     "OpenSSL include dirs")
@@ -73,6 +81,7 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
     ${GNUTLS_INCLUDE_DIRS}
+    ${GNUTLS_DANE_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
     ${NSS_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIRS}
@@ -81,15 +90,17 @@ include_directories(
 )
 link_directories(
     ${CMAKE_SOURCE_DIR}/lib
-    ${GNUTLS_LDFLAGS}
-    ${OPENSSL_LDFLAGS}
-    ${NSS_LDFLAGS}
-    ${SQLITE_LDFLAGS}
-    ${GTK_LDFLAGS}
-    ${GCR_LDFLAGS}
+    ${GNUTLS_LIBDIR}
+    ${GNUTLS_DANE_LIBDIR}
+    ${OPENSSL_LIBDIR}
+    ${NSS_LIBDIR}
+    ${SQLITE_LIBDIR}
+    ${GTK_LIBDIR}
+    ${GCR_LIBDIR}
 )
 
 set(HAVE_GNUTLS ${GNUTLS_LIBRARIES})
+set(HAVE_GNUTLS_DANE ${GNUTLS_DANE_LIBRARIES})
 set(HAVE_OPENSSL ${OPENSSL_LIBRARIES})
 set(HAVE_NSS ${NSS_LIBRARIES})
 

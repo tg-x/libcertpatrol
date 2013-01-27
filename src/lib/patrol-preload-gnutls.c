@@ -74,6 +74,7 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
                                                                &chain_len);
 
     int pret = PATROL_GNUTLS_verify(chain, chain_len,
+                                    gnutls_certificate_type_get(session), ret,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);
@@ -142,6 +143,7 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
                                                                &chain_len);
 
     int pret = PATROL_GNUTLS_verify(chain, chain_len,
+                                    gnutls_certificate_type_get(session), ret,
                                     hostname, strlen(hostname),
                                     addr, strlen(addr),
                                     protoname, strlen(protoname), port);

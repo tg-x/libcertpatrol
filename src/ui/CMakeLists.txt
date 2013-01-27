@@ -3,8 +3,19 @@ add_executable(certpatrol-dialog
   dialog-window.c
 )
 add_dependencies(certpatrol-dialog certpatrol)
-target_link_libraries(certpatrol-dialog
+
+set(LIBS
     certpatrol
+    ${GTK_LIBRARIES}
     ${GCR_LIBRARIES}
 )
+if(GNUTLS_DANE_LIBRARIES)
+    set(LIBS
+        ${LIBS}
+        ${GNUTLS_LIBRARIES}
+        ${GNUTLS_DANE_LIBRARIES}
+    )
+endif()
+
+target_link_libraries(certpatrol-dialog ${LIBS})
 install_targets(/bin certpatrol-dialog)

@@ -1,7 +1,10 @@
 #ifndef PATROL_DIALOG_H
 # define PATROL_DIALOG_H
 
+#include <gtk/gtk.h>
 #include <gcr/gcr.h>
+
+#define PATROL_ARG_UNKNOWN G_MAXINT
 
 typedef struct {
     GcrCertificateChain *chain;

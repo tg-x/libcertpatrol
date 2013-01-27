@@ -168,6 +168,8 @@
 
 #cmakedefine HAVE_GNUTLS 1
 
+#cmakedefine HAVE_GNUTLS_DANE 1
+
 #cmakedefine HAVE_OPENSSL 1
 
 #cmakedefine HAVE_NSS 1

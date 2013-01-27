@@ -1,4 +1,3 @@
-#include "config.h"
 #include "common.h"
 #include "dialog.h"
 #include "dialog-window.h"
@@ -6,6 +5,11 @@
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
 #include <gcr/gcr.h>
+
+#ifdef HAVE_GNUTLS_DANE
+# include <gnutls/gnutls.h>
+# include <gnutls/dane.h>
+#endif
 
 #include <locale.h>
 #include <string.h>
@@ -19,6 +23,13 @@ struct _PatrolDialogWindowPrivate {
     gboolean add;
 
     GtkWidget *msg;
+    GtkWidget *icon;
+    GtkWidget *chain_msg;
+    GtkWidget *chain_icon;
+#ifdef HAVE_GNUTLS_DANE
+    GtkWidget *dane_msg;
+    GtkWidget *dane_icon;
+#endif
     GtkWidget *new_chain;
     GtkWidget *old_chains;
 
@@ -99,42 +110,63 @@ patrol_dialog_window_constructed (GObject *obj)
 
     /* content area */
     GtkWidget *content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_margin_left(GTK_WIDGET(content), 6);
-    gtk_widget_set_margin_right(GTK_WIDGET(content), 6);
+    gtk_widget_set_margin_left(GTK_WIDGET(content), 10);
+    gtk_widget_set_margin_right(GTK_WIDGET(content), 10);
     gtk_container_add(GTK_CONTAINER(self), content);
-    gtk_widget_show(content);
 
-    /* message */
+    /* messages */
+    GtkWidget *msgbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(content), msgbox, FALSE, FALSE, 6);
+
+    pv->icon = gtk_image_new();
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->icon, FALSE, FALSE, 6);
+
     pv->msg = gtk_label_new(NULL);
     gtk_widget_set_halign(GTK_WIDGET(pv->msg), GTK_ALIGN_START);
-    gtk_box_pack_start(GTK_BOX(content), pv->msg, FALSE, FALSE, 6);
-    gtk_widget_show(pv->msg);
+    gtk_widget_set_margin_top(GTK_WIDGET(pv->msg), 10);
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->msg, FALSE, FALSE, 6);
+
+    msgbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(content), msgbox, FALSE, FALSE, 6);
+
+    pv->chain_icon = gtk_image_new();
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->chain_icon, FALSE, FALSE, 6);
+
+    pv->chain_msg = gtk_label_new(NULL);
+    gtk_widget_set_halign(GTK_WIDGET(pv->chain_msg), GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->chain_msg, FALSE, FALSE, 6);
+
+#ifdef HAVE_GNUTLS_DANE
+    msgbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(content), msgbox, FALSE, FALSE, 6);
+
+    pv->dane_icon = gtk_image_new();
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->dane_icon, FALSE, FALSE, 6);
+
+    pv->dane_msg = gtk_label_new(NULL);
+    gtk_widget_set_halign(GTK_WIDGET(pv->dane_msg), GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(msgbox), pv->dane_msg, FALSE, FALSE, 6);
+#endif
 
     /* details: chains & cert viewer */
     GtkWidget *details = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
     gtk_box_pack_start(GTK_BOX(content), details, FALSE, FALSE, 6);
-    gtk_widget_show(GTK_WIDGET(details));
 
     GtkWidget *chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(details), chains, FALSE, FALSE, 0);
-    gtk_widget_show(GTK_WIDGET(chains));
 
     pv->new_chain = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(chains), pv->new_chain, FALSE, FALSE, 0);
-    gtk_widget_show(GTK_WIDGET(pv->new_chain));
 
     //pv->old_chains = gtk_layout_new(NULL, NULL);
     pv->old_chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(chains), pv->old_chains, TRUE, TRUE, 0);
-    gtk_widget_show(GTK_WIDGET(pv->old_chains));
 
     gtk_box_pack_start(GTK_BOX(details), GTK_WIDGET(pv->viewer), TRUE, TRUE, 0);
-    gtk_widget_show(GTK_WIDGET(pv->viewer));
 
     /* additional pin checkbox */
     GtkWidget *add = gtk_check_button_new_with_mnemonic(
         _("_Store additional pin instead of replacing existing ones"));
-    gtk_widget_show(add);
     g_signal_connect_object(GTK_TOGGLE_BUTTON(add), "toggled",
                             G_CALLBACK(on_add_toggled), self, 0);
 
@@ -151,6 +183,7 @@ patrol_dialog_window_constructed (GObject *obj)
     /* reject button */
     GtkWidget *btn = gtk_button_new_from_stock(GTK_STOCK_NO);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Reject"));
+    gtk_widget_set_tooltip_text(btn, _("Reject certificate.\nCauses verification failure."));
     gtk_box_pack_start(GTK_BOX(bbox), btn, FALSE, TRUE, 0);
     g_signal_connect_object (GTK_BUTTON(btn), "clicked",
                              G_CALLBACK(on_reject_clicked), self, 0);
@@ -158,6 +191,7 @@ patrol_dialog_window_constructed (GObject *obj)
     /* continue button */
     btn = gtk_button_new_from_stock(GTK_STOCK_CANCEL);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Continue"));
+    gtk_widget_set_tooltip_text(btn, _("Temporarily accept public key, but do not pin it."));
     gtk_box_pack_start(GTK_BOX(bbox), btn, FALSE, TRUE, 0);
     g_signal_connect_object(GTK_BUTTON(btn), "clicked",
                             G_CALLBACK(on_continue_clicked), self, 0);
@@ -166,11 +200,12 @@ patrol_dialog_window_constructed (GObject *obj)
     /* accept button */
     btn = gtk_button_new_from_stock(GTK_STOCK_YES);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Accept"));
+    gtk_widget_set_tooltip_text(btn, _("Accept and pin public key.\nReplace or add pin depending on the above setting."));
     gtk_box_pack_start(GTK_BOX(bbox), btn, FALSE, TRUE, 0);
     g_signal_connect_object(GTK_BUTTON(btn), "clicked",
                             G_CALLBACK(on_accept_clicked), self, 0);
 
-    gtk_widget_show_all(bbox);
+    gtk_widget_show_all(content);
 }
 
 static void
@@ -297,7 +332,9 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
 
 void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
-                           const gchar *proto, guint16 port, GList *chains)
+                           const gchar *proto, guint16 port, GList *chains,
+                           gint chain_result, gint dane_result,
+                           gint dane_status)
 {
     PatrolDialogWindowPrivate *pv = self->pv;
     pv->host = host;
@@ -308,16 +345,63 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
     if (!chains)
         return;
 
+    /* msg */
+    gtk_image_set_from_stock(GTK_IMAGE(pv->icon),
+                             (g_list_length(chains) > 1)
+                             ? GTK_STOCK_DIALOG_WARNING
+                             : GTK_STOCK_DIALOG_INFO,
+                             GTK_ICON_SIZE_BUTTON);
+
     gchar *text = g_strdup_printf(
         g_list_length(chains) > 1
-        ? _("New public key detected for peer %s:%u (%s).\n"
-            "Accept it and pin it, reject it, or continue and decide later?")
-        : _("Public key change detected for peer %s:%u (%s).\n"
-            "Accept it and replace the pin, accept it and add as additional pin, "
-            "reject it, or continue and decide later?"),
+        ? _("<b>Public key change</b> detected for peer <b>%s:%u (%s)</b>.\n")
+        : _("<b>New public key</b> detected for peer <b>%s:%u (%s)</b>.\n"),
         host, port, proto);
-    gtk_label_set_text(GTK_LABEL(pv->msg), text);
+    gtk_label_set_markup(GTK_LABEL(pv->msg), text);
     g_free(text);
+
+    /* chain_msg */
+    if (chain_result != PATROL_ARG_UNKNOWN) {
+        gtk_image_set_from_stock(GTK_IMAGE(pv->chain_icon),
+                                 (chain_result == PATROL_OK)
+                                 ? GTK_STOCK_APPLY
+                                 : GTK_STOCK_DIALOG_ERROR,
+                                 GTK_ICON_SIZE_BUTTON);
+
+        text = g_strdup_printf(
+            "<b>%s</b>: %s.",
+            _("Certificate chain validation"),
+            chain_result == PATROL_OK ? _("Success") : _("Fail"));
+        gtk_label_set_markup(GTK_LABEL(pv->chain_msg), text);
+        g_free(text);
+    } else {
+        gtk_widget_hide(gtk_widget_get_parent(pv->chain_msg));
+    }
+
+#ifdef HAVE_GNUTLS_DANE
+    /* dane_msg */
+    if (dane_result != PATROL_ARG_UNKNOWN) {
+        gtk_image_set_from_stock(GTK_IMAGE(pv->dane_icon),
+                                 (dane_result == DANE_E_SUCCESS)
+                                 ? GTK_STOCK_APPLY
+                                 : GTK_STOCK_DIALOG_ERROR,
+                                 GTK_ICON_SIZE_BUTTON);
+
+        gnutls_datum_t dane_status_str;
+        dane_verification_status_print(dane_status, &dane_status_str, 0);
+        text = g_strdup_printf(
+            "<b>%s</b>: %s %.*s",
+            _("DANE validation"),
+            dane_strerror(dane_result),
+            dane_status_str.size, dane_status_str.data);
+        gnutls_free(dane_status_str.data);
+
+        gtk_label_set_markup(GTK_LABEL(pv->dane_msg), text);
+        g_free(text);
+    } else {
+        gtk_widget_hide(gtk_widget_get_parent(pv->dane_msg));
+    }
+#endif
 
     GList *item = chains;
     guint i = 0;
@@ -372,10 +456,13 @@ patrol_dialog_window_class_init (PatrolDialogWindowClass *cls)
 
 PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
-                          guint16 port, GList *chains)
+                          guint16 port, GList *chains,
+                          gint chain_result, gint dane_result,
+                          gint dane_status)
 {
     PatrolDialogWindow *self = g_object_new(PATROL_TYPE_DIALOG_WINDOW, NULL);
-    patrol_dialog_window_load(self, host, proto, port, chains);
+    patrol_dialog_window_load(self, host, proto, port, chains,
+                              chain_result, dane_result, dane_status);
     return self;
 }
 

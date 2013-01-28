@@ -6,6 +6,7 @@ add_library(certpatrol SHARED
 )
 target_link_libraries(certpatrol
     ${SQLITE_LIBRARIES}
+    ${LIBTASN1_LIBRARIES}
 )
 install(TARGETS certpatrol DESTINATION lib)
 

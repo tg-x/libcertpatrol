@@ -20,6 +20,7 @@ set(CMAKE_C_FLAGS_RELEASE "-O2" CACHE STRING
     "C flags for release" FORCE)
 
 include(FindPkgConfig)
+pkg_check_modules(PKG_LIBTASN1 libtasn1 REQUIRED)
 pkg_check_modules(PKG_GNUTLS gnutls REQUIRED)
 pkg_check_modules(PKG_GNUTLS_DANE gnutls-dane)
 pkg_check_modules(PKG_OPENSSL openssl)
@@ -27,6 +28,13 @@ pkg_check_modules(PKG_NSS nss)
 pkg_check_modules(PKG_SQLITE sqlite3 REQUIRED)
 pkg_check_modules(PKG_GTK gtk+-3.0 REQUIRED)
 pkg_check_modules(PKG_GCR gcr-3 REQUIRED)
+
+set(LIBTASN1_INCLUDE_DIRS ${PKG_LIBTASN1_INCLUDE_DIRS} CACHE STRING
+    "libtasn1 include dirs")
+set(LIBTASN1_LIBDIR ${PKG_LIBTASN1_LIBDIR} CACHE STRING
+    "libtasn1 lib dir")
+set(LIBTASN1_LIBRARIES ${PKG_LIBTASN1_LIBRARIES} CACHE STRING
+    "libtasn1 libraries")
 
 set(GNUTLS_INCLUDE_DIRS ${PKG_GNUTLS_INCLUDE_DIRS} CACHE STRING
     "GnuTLS include dirs")

@@ -105,7 +105,7 @@ patrol_dialog_window_constructed (GObject *obj)
     PatrolDialogWindowPrivate *pv = self->pv;
 
     gtk_window_set_title(GTK_WINDOW(self), _("Certificate Patrol"));
-    gtk_window_set_default_size(GTK_WINDOW(self), 500, 800);
+    gtk_window_set_default_size(GTK_WINDOW(self), 500, 700);
     //gtk_window_set_position(GTK_WINDOW(self), GTK_WIN_POS_MOUSE);
 
     /* content area */
@@ -304,6 +304,21 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
         g_free(label);
     }
 
+    /* set header */
+    gchar *title;
+    if (idx == 0)
+        title = g_strdup_printf(_("<b>New Certificate</b>"));
+    else
+        title = g_strdup_printf(_("<b>Stored Certificate #%d</b>"), idx);
+
+    GtkWidget *header = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(header), title);
+    gtk_widget_set_halign(GTK_WIDGET(header), GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(container), header, FALSE, FALSE, 0);
+    gtk_widget_show(header);
+    g_free(title);
+
+
     /* build tree viewer */
     GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
     gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
@@ -320,6 +335,21 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
         gtk_tree_selection_select_iter(tree_sel, &iter);
 
     /* first column */
+    /*
+    gchar *title = NULL;
+    if (idx == 0)
+        title = g_strdup_printf(_("New Certificate Hierarchy"));
+    else
+        title = g_strdup_printf(_("Old Certificate Hierarchy, stored since, expires "));
+    GtkCellRenderer *tree_renderer = gtk_cell_renderer_text_new();
+    GtkTreeViewColumn *tree_column
+        = gtk_tree_view_column_new_with_attributes(title,
+        //= gtk_tree_view_column_new_with_attributes(_("Certificate Hierarchy"),
+                                        tree_renderer, "text", COL_NAME, NULL);
+    gtk_tree_view_column_set_expand (tree_column, TRUE);
+    gtk_tree_view_insert_column (GTK_TREE_VIEW (tree_view), tree_column, -1);
+    g_free(title);
+    */
     GtkCellRenderer *tree_renderer = gtk_cell_renderer_text_new();
     GtkTreeViewColumn *tree_column
         = gtk_tree_view_column_new_with_attributes(_("Certificate Hierarchy"),

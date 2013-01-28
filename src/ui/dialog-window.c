@@ -105,7 +105,7 @@ patrol_dialog_window_constructed (GObject *obj)
     PatrolDialogWindowPrivate *pv = self->pv;
 
     gtk_window_set_title(GTK_WINDOW(self), _("Certificate Patrol"));
-    gtk_window_set_default_size(GTK_WINDOW(self), 500, 500);
+    gtk_window_set_default_size(GTK_WINDOW(self), 500, 800);
     //gtk_window_set_position(GTK_WINDOW(self), GTK_WIN_POS_MOUSE);
 
     /* content area */
@@ -159,7 +159,7 @@ patrol_dialog_window_constructed (GObject *obj)
     gtk_box_pack_start(GTK_BOX(chains), pv->new_chain, FALSE, FALSE, 0);
 
     GtkWidget *old_chains_box = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(old_chains_box), 
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(old_chains_box),
                 GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
     gtk_box_pack_start(GTK_BOX(chains), old_chains_box, TRUE, TRUE, 0);
 
@@ -214,7 +214,8 @@ patrol_dialog_window_constructed (GObject *obj)
 }
 
 static void
-on_cert_changed (GcrCertificateRenderer *renderer, gpointer arg) {
+on_cert_changed (GcrCertificateRenderer *renderer, gpointer arg)
+{
     GtkTreeView *tree_view = GTK_TREE_VIEW(arg);
     GtkTreeSelection *tree_sel = gtk_tree_view_get_selection(tree_view);
     if (tree_sel != cur_sel)
@@ -222,7 +223,8 @@ on_cert_changed (GcrCertificateRenderer *renderer, gpointer arg) {
 }
 
 static gboolean
-on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg) {
+on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg)
+{
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
     GcrCertificate *cert;
     GtkTreeIter iter;
@@ -239,7 +241,8 @@ on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg) 
 }
 
 static void
-on_tree_selection_changed (GtkTreeSelection *tree_sel, gpointer arg) {
+on_tree_selection_changed (GtkTreeSelection *tree_sel, gpointer arg)
+{
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
     GcrCertificate *cert;
     GtkTreeIter iter;
@@ -254,7 +257,8 @@ on_tree_selection_changed (GtkTreeSelection *tree_sel, gpointer arg) {
 }
 
 static void
-on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg) {
+on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg)
+{
     GtkTreeModel *tree_model = GTK_TREE_MODEL(arg);
     GtkTreeIter iter, current, child;
     gboolean enabled, valid = TRUE;

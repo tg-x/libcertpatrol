@@ -252,8 +252,8 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
     PatrolPinMode pin_mode = PATROL_PIN_EXCLUSIVE;
 
     if (ret != PATROL_OK && cmd != NULL) {
-        cmd_ret = PATROL_exec_cmd(cmd, host, proto, port,
-                                  cert_id, chain_result, dret, dvstatus, !notify);
+        cmd_ret = PATROL_exec_cmd(cmd, host, proto, port, cert_id,
+                                  chain_result, dret, dvstatus, NULL, !notify);
     }
 
     switch (cmd_ret) {

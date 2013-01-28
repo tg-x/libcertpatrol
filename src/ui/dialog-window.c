@@ -123,7 +123,7 @@ patrol_dialog_window_constructed (GObject *obj)
 
     pv->msg = gtk_label_new(NULL);
     gtk_widget_set_halign(GTK_WIDGET(pv->msg), GTK_ALIGN_START);
-    gtk_widget_set_margin_top(GTK_WIDGET(pv->msg), 10);
+    gtk_widget_set_margin_top(GTK_WIDGET(pv->msg), 25);
     gtk_box_pack_start(GTK_BOX(msgbox), pv->msg, FALSE, FALSE, 6);
 
     msgbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
@@ -334,7 +334,7 @@ void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                            const gchar *proto, guint16 port, GList *chains,
                            gint chain_result, gint dane_result,
-                           gint dane_status)
+                           gint dane_status, gchar *app_name)
 {
     PatrolDialogWindowPrivate *pv = self->pv;
     pv->host = host;
@@ -350,13 +350,15 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                              (g_list_length(chains) > 1)
                              ? GTK_STOCK_DIALOG_WARNING
                              : GTK_STOCK_DIALOG_INFO,
-                             GTK_ICON_SIZE_BUTTON);
+                             GTK_ICON_SIZE_DIALOG);
 
     gchar *text = g_strdup_printf(
         g_list_length(chains) > 1
-        ? _("<b>Public key change</b> detected for peer <b>%s:%u (%s)</b>.\n")
-        : _("<b>New public key</b> detected for peer <b>%s:%u (%s)</b>.\n"),
-        host, port, proto);
+        ? _("<b>Public key change</b> detected for peer <b>%s:%u (%s)</b>\n"
+            "in application <b>%s</b>\n")
+        : _("<b>New public key</b> detected for peer <b>%s:%u (%s)</b>\n"
+            "in application <b>%s</b>\n"),
+        host, port, proto, app_name);
     gtk_label_set_markup(GTK_LABEL(pv->msg), text);
     g_free(text);
 
@@ -387,8 +389,9 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                                  : GTK_STOCK_DIALOG_ERROR,
                                  GTK_ICON_SIZE_BUTTON);
 
-        gnutls_datum_t dane_status_str;
-        dane_verification_status_print(dane_status, &dane_status_str, 0);
+        gnutls_datum_t dane_status_str = { 0 };
+        if (dane_result >= 0 || dane_status != 0)
+            dane_verification_status_print(dane_status, &dane_status_str, 0);
         text = g_strdup_printf(
             "<b>%s</b>: %s %.*s",
             _("DANE validation"),
@@ -458,11 +461,11 @@ PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
                           guint16 port, GList *chains,
                           gint chain_result, gint dane_result,
-                          gint dane_status)
+                          gint dane_status, gchar *app_name)
 {
     PatrolDialogWindow *self = g_object_new(PATROL_TYPE_DIALOG_WINDOW, NULL);
-    patrol_dialog_window_load(self, host, proto, port, chains,
-                              chain_result, dane_result, dane_status);
+    patrol_dialog_window_load(self, host, proto, port, chains, chain_result,
+                              dane_result, dane_status, app_name);
     return self;
 }
 

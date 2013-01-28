@@ -84,7 +84,8 @@ PATROL_get_peer_addr (int fd, int *proto,
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                  uint16_t port, int64_t cert_id, int chain_result,
-                 int dane_result, int dane_status, bool wait);
+                 int dane_result, int dane_status, const char *app_name,
+                 bool wait);
 
 /** Get stored certificates of a peer.
  *

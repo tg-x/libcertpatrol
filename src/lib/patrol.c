@@ -68,7 +68,8 @@ PATROL_get_peer_addr (int fd, int *proto,
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                  uint16_t port, int64_t cert_id, int chain_result,
-                 int dane_result, int dane_status, bool wait)
+                 int dane_result, int dane_status, const char *app_name,
+                 bool wait)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -87,7 +88,9 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                   cmd, host, proto, prt, id, cres, dres, dstatus);
         execlp(cmd, cmd, "--host", host, "--proto", proto, "--port", prt,
                "--id", id, "--chain-result", cres, "--dane-result", dres,
-               "--dane-status", dstatus, NULL);
+               "--dane-status", dstatus,
+               app_name ? "--app_name" : NULL, app_name,
+               NULL);
         perror("exec");
         _exit(-1);
     }

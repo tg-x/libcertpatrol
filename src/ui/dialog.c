@@ -10,6 +10,8 @@
 
 #include <locale.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <string.h>
 
 static gboolean
@@ -138,7 +140,7 @@ main (int argc, char *argv[])
     GOptionContext *context;
     GError *error = NULL;
 
-    gchar *host = NULL, *proto = NULL, **args = NULL;
+    gchar *host = NULL, *proto = NULL, *app_name = NULL, **args = NULL;
     guint16 port = 0;
     gint64 cert_id = -1;
     gint chain_result = PATROL_ARG_UNKNOWN;
@@ -168,6 +170,9 @@ main (int argc, char *argv[])
 
         { "dane-status", 'D', 0, G_OPTION_ARG_INT, &dane_status,
           N_("DANE validation status"), NULL },
+
+        { "app-name", 'n', 0, G_OPTION_ARG_STRING, &app_name,
+          N_("Application name - defaults to parent process cmdline"), NULL },
 
         { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &args,
           NULL, NULL },
@@ -206,6 +211,23 @@ main (int argc, char *argv[])
         exit(-1);
     }
 
+    if (!app_name) {
+        char *cmd = malloc(64);
+        snprintf(cmd, 64, "ps -o args= -p %lu", (unsigned long) getppid());
+        FILE *pipe = popen(cmd, "r");
+        if (pipe) {
+            app_name = malloc(4096);
+            fgets(app_name, 4096, pipe);
+            pclose(pipe);
+        }
+        if (!app_name) {
+            app_name = malloc(32);
+            snprintf(app_name, 32, "PID %lu", (unsigned long) getppid());
+        }
+    }
+
+    LOG_DEBUG("app_name = %s", app_name);
+
     g_option_context_free(context);
     g_set_application_name(_("Certificate Patrol"));
 
@@ -216,8 +238,8 @@ main (int argc, char *argv[])
         exit(-1);
 
     PatrolDialogWindow *win
-        = patrol_dialog_window_new(host, proto, port, chains,
-                                   chain_result, dane_result, dane_status);
+        = patrol_dialog_window_new(host, proto, port, chains, chain_result,
+                                   dane_result, dane_status, app_name);
     gtk_widget_show(GTK_WIDGET(win));
 
     g_signal_connect(win, "accept", G_CALLBACK(on_window_close),

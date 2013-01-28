@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include <sqlite3.h>
+#include <libtasn1.h>
 
 #ifdef DEBUG
 //# define DEBUG_DB
@@ -118,21 +119,42 @@ fill_record (sqlite3_stmt *stmt, PatrolRecord *rec)
     rec->last_seen = sqlite3_column_int64(stmt, 3);
     rec->count_seen = sqlite3_column_int64(stmt, 4);
 
+    rec->chain_len = 1;
     size_t ca_chain_len = sqlite3_column_bytes(stmt, 6);
-    rec->chain_len = 1 + (ca_chain_len ? 2 : 0); // FIXME
+    const unsigned char *ca_chain = sqlite3_column_blob(stmt, 6);
+    size_t cur = 0, i = 1;
+    long len = 0;
+    int len_len = 0;
+
+    /* determine DER-encoded ca_chain length */
+    while (cur < ca_chain_len) {
+        len = asn1_get_length_der(ca_chain + cur + 1, ca_chain_len - cur,
+                                  &len_len);
+        if (len > 0) {
+            cur += 1 + len_len + len;
+            rec->chain_len++;
+        } else break;
+    }
+
     rec->chain = malloc(rec->chain_len * sizeof(PatrolData));
 
+    /* add end entity cert to chain */
     rec->chain[0].size = sqlite3_column_bytes(stmt, 5);
     rec->chain[0].data = malloc(rec->chain[0].size);
     memcpy(rec->chain[0].data, sqlite3_column_blob(stmt, 5), rec->chain[0].size);
 
-    if (ca_chain_len) {
-        rec->chain[1].size = ca_chain_len;
-        rec->chain[1].data = malloc(rec->chain[1].size);
-        memcpy(rec->chain[1].data, sqlite3_column_blob(stmt, 6),
-               rec->chain[1].size);
-
-        rec->chain[2] = rec->chain[1]; // FIXME
+    /* add DER-encoded certs from ca_chain to chain */
+    cur = 0;
+    while (cur < ca_chain_len) {
+        len = asn1_get_length_der(ca_chain + cur + 1, ca_chain_len - cur,
+                                  &len_len);
+        if (len > 0) {
+            rec->chain[i].size = 1 + len_len + len;
+            rec->chain[i].data = malloc(rec->chain[i].size);
+            memcpy(rec->chain[i].data, ca_chain + cur,
+                   rec->chain[i].size);
+            cur += rec->chain[i++].size;
+        } else break;
     }
 
     rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
@@ -327,7 +349,7 @@ PATROL_add_cert (const char *host, size_t host_len,
 
     PatrolRC ret = PATROL_ERROR;
     unsigned char *ca_chain = NULL;
-    size_t ca_chain_len = 0;
+    size_t i, cur, ca_chain_len = 0;
     *cert_id = -1;
 
     if (sqlite3_bind_blob(stmt_sel_cert, 1, chain[0].data, chain[0].size,
@@ -367,21 +389,15 @@ PATROL_add_cert (const char *host, size_t host_len,
     }
 
     if (*cert_id < 0) {
-        if (chain_len > 1) {
-            ca_chain = chain[1].data;
-            ca_chain_len = chain[1].size;
-        }
-/* FIXME
         // construct a DER-encoded buffer of CA certificates
-
         for (i = 1; i < chain_len; i++)
             ca_chain_len += chain[i].size;
 
         ca_chain = malloc(ca_chain_len);
-
-        for (i = 1; i < chain_len; i++)
-            memcpy(ca_chain, chain[i].data, chain[i].size);
-*/
+        for (i = 1, cur = 0; i < chain_len; i++) {
+            memcpy(ca_chain + cur, chain[i].data, chain[i].size);
+            cur += chain[i].size;
+        }
 
         if (sqlite3_bind_blob(stmt_ins_cert, 1, chain[0].data, chain[0].size, SQLITE_STATIC) != SQLITE_OK ||
             sqlite3_bind_blob(stmt_ins_cert, 2, ca_chain, ca_chain_len, SQLITE_STATIC) != SQLITE_OK ||

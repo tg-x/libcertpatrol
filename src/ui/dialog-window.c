@@ -150,17 +150,22 @@ patrol_dialog_window_constructed (GObject *obj)
 
     /* details: chains & cert viewer */
     GtkWidget *details = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
-    gtk_box_pack_start(GTK_BOX(content), details, FALSE, FALSE, 6);
+    gtk_box_pack_start(GTK_BOX(content), details, TRUE, TRUE, 6);
 
-    GtkWidget *chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    GtkWidget *chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_box_pack_start(GTK_BOX(details), chains, FALSE, FALSE, 0);
 
     pv->new_chain = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     gtk_box_pack_start(GTK_BOX(chains), pv->new_chain, FALSE, FALSE, 0);
 
-    //pv->old_chains = gtk_layout_new(NULL, NULL);
-    pv->old_chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    gtk_box_pack_start(GTK_BOX(chains), pv->old_chains, TRUE, TRUE, 0);
+    GtkWidget *old_chains_box = gtk_scrolled_window_new(NULL, NULL);
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(old_chains_box), 
+                GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_box_pack_start(GTK_BOX(chains), old_chains_box, TRUE, TRUE, 0);
+
+    pv->old_chains = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW(old_chains_box),
+                                                    GTK_WIDGET(pv->old_chains));
 
     gtk_box_pack_start(GTK_BOX(details), GTK_WIDGET(pv->viewer), TRUE, TRUE, 0);
 
@@ -312,10 +317,11 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
 
     /* first column */
     GtkCellRenderer *tree_renderer = gtk_cell_renderer_text_new();
-    gtk_tree_view_insert_column_with_attributes(
-        GTK_TREE_VIEW(tree_view), -1, _("Certificate Hierarchy"),
-        tree_renderer, "text", COL_NAME, NULL
-    );
+    GtkTreeViewColumn *tree_column
+        = gtk_tree_view_column_new_with_attributes(_("Certificate Hierarchy"),
+                                        tree_renderer, "text", COL_NAME, NULL);
+    gtk_tree_view_column_set_expand (tree_column, TRUE);
+    gtk_tree_view_insert_column (GTK_TREE_VIEW (tree_view), tree_column, -1);
 
     /* second column */
     GtkCellRenderer *toggle_renderer = gtk_cell_renderer_toggle_new();

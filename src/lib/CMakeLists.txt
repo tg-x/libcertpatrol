@@ -2,6 +2,7 @@
 
 add_library(certpatrol SHARED
   patrol.c
+  patrol-db.c
   patrol-db-sqlite.c
 )
 target_link_libraries(certpatrol

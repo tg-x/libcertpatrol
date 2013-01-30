@@ -15,18 +15,12 @@
 # include <gnutls/dane.h>
 #endif
 
-#define GNUTLS_CHECK_VERSION(major, minor, patch)                       \
-    (GNUTLS_VERSION_MAJOR > major                                       \
-     || (GNUTLS_VERSION_MAJOR == major && GNUTLS_VERSION_MINOR > minor) \
-     || (GNUTLS_VERSION_MAJOR == major && GNUTLS_VERSION_MINOR == minor \
-         && GNUTLS_VERSION_PATCH >= patch))
-
 /** Verify certificate chain of peer.
  */
 PatrolRC
 PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                       gnutls_certificate_type_t chain_type,
-                      PatrolRC chain_result,
+                      int chain_result, //unsigned int chain_status,
                       const char *host, size_t host_len,
                       const char *addr, size_t addr_len,
                       const char *proto, size_t proto_len,
@@ -181,7 +175,7 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
         // make a list of pubkeys present in the chain
         size_t pubkey_list_len = chain_len;
         PatrolData *pubkey_list
-            = malloc(pubkey_list_len * sizeof(PatrolData));
+            = gnutls_malloc(pubkey_list_len * sizeof(PatrolData));
 
         for (i = 0; i < chain_len; i++) {
             gnutls_x509_crt_init(&crt);
@@ -276,4 +270,140 @@ PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
     }
 
     return ret;
+}
+
+typedef struct crt_list crt_list;
+struct crt_list {
+    gnutls_x509_crt_t crt;
+    crt_list *next;
+};
+
+typedef int (*GetIssuer) (const void *ca_list, gnutls_x509_crt_t cert,
+                          gnutls_x509_crt_t *issuer, unsigned int flags);
+
+PatrolRC
+verify_list (const gnutls_datum_t *chain, size_t chain_len,
+             gnutls_certificate_type_t chain_type,
+             int chain_result, //unsigned int chain_status,
+             GetIssuer get_issuer, const void *ca_list,
+             const char *host, size_t host_len,
+             const char *addr, size_t addr_len,
+             const char *proto, size_t proto_len,
+             uint16_t port)
+{
+    if (!chain_len)
+        return PATROL_ERROR;
+
+    crt_list *ch, *cur, *prev = NULL;
+    gnutls_x509_crt_t tail, crt, issuer;
+    gnutls_datum_t *new_chain = (gnutls_datum_t *) chain;
+    size_t i, new_len = chain_len;
+
+    gnutls_x509_crt_init(&tail);
+    int r = gnutls_x509_crt_import(tail, &chain[chain_len - 1],
+                                   GNUTLS_X509_FMT_DER);
+    if (r != GNUTLS_E_SUCCESS) {
+        LOG_DEBUG(">>> error importing cert: %d", r);
+        return PATROL_ERROR;
+    }
+    crt = tail;
+
+    do {
+        if (gnutls_x509_crt_check_issuer(crt, crt))
+            break; // self-signed, end of chain
+
+        issuer = NULL;
+        get_issuer(ca_list, crt, &issuer, 0);
+        if (!issuer)
+            break;
+
+        crt = issuer;
+        new_len++;
+
+        cur = gnutls_malloc(sizeof(crt_list));
+        cur->crt = crt;
+        cur->next = NULL;
+        if (prev)
+            prev->next = cur;
+        else
+            ch = cur;
+        prev = cur;
+    } while (1);
+
+    gnutls_x509_crt_deinit(tail);
+
+    if (new_len > chain_len) {
+        new_chain = gnutls_malloc(new_len * sizeof(gnutls_datum_t));
+
+        for (i = 0; i < chain_len; i++)
+            new_chain[i] = chain[i];
+
+        for (cur = ch; cur != NULL; cur = cur->next, i++) {
+            gnutls_datum_t crt_der;
+#if GNUTLS_CHECK_VERSION(3,1,0)
+            r = gnutls_x509_crt_export2(cur->crt, GNUTLS_X509_FMT_DER, &crt_der);
+#else
+            crt_der.data = gnutls_malloc(new_chain[i].size);
+            crt_der.size = new_chain[i].size;
+            r = gnutls_x509_crt_export(cur->crt, GNUTLS_X509_FMT_DER,
+                                       crt_der.data,
+                                       (size_t *) &(crt_der.size));
+#endif
+            new_chain[i] = crt_der;
+        }
+        LOG_DEBUG(">>> added %zu CAs to chain", new_len - chain_len);
+    }
+
+    PatrolRC ret
+        = PATROL_GNUTLS_verify(new_chain, new_len,
+                               chain_type, chain_result, host, host_len,
+                               addr, addr_len,
+                               proto, proto_len, port);
+
+    if (new_len > chain_len) {
+        for (i = chain_len; i < new_len; i++) {
+            gnutls_free(chain[i].data);
+        }
+        gnutls_free(new_chain);
+        for (cur = ch, prev = NULL; cur != NULL; ) {
+            prev = cur;
+            cur = cur->next;
+            free(prev);
+        }
+    }
+
+    return ret;
+}
+
+
+PatrolRC
+PATROL_GNUTLS_verify_trust_list (const gnutls_datum_t *chain, size_t chain_len,
+                                 gnutls_certificate_type_t chain_type,
+                                 int chain_result, //unsigned int chain_status,
+                                 const gnutls_x509_trust_list_t trust_list,
+                                 const char *host, size_t host_len,
+                                 const char *addr, size_t addr_len,
+                                 const char *proto, size_t proto_len,
+                                 uint16_t port)
+{
+    return verify_list(chain, chain_len, chain_type, chain_result,
+                       (GetIssuer) gnutls_x509_trust_list_get_issuer, trust_list,
+                       host, host_len, addr, addr_len,
+                       proto, proto_len, port);
+}
+
+PatrolRC
+PATROL_GNUTLS_verify_credentials (const gnutls_datum_t *chain, size_t chain_len,
+                                  gnutls_certificate_type_t chain_type,
+                                  int chain_result, //unsigned int chain_status,
+                                  const gnutls_certificate_credentials_t credentials,
+                                  const char *host, size_t host_len,
+                                  const char *addr, size_t addr_len,
+                                  const char *proto, size_t proto_len,
+                                  uint16_t port)
+{
+    return verify_list(chain, chain_len, chain_type, chain_result,
+                       (GetIssuer) gnutls_certificate_get_issuer, credentials,
+                       host, host_len, addr, addr_len,
+                       proto, proto_len, port);
 }

@@ -33,8 +33,13 @@ typedef union {
     uint32_t num;
 } extension_priv_data_t;
 
-int _gnutls_ext_get_session_data (gnutls_session_t session,
-                                  uint16_t type, extension_priv_data_t *);
+int
+_gnutls_ext_get_session_data (gnutls_session_t session,
+                              uint16_t type, extension_priv_data_t *);
+
+const void *
+_gnutls_get_cred (gnutls_session_t session,
+                  gnutls_credentials_type_t kx, int *err);
 
 /** Verify the peer's certificate.
  *
@@ -142,11 +147,13 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
     const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
                                                                &chain_len);
 
-    int pret = PATROL_GNUTLS_verify(chain, chain_len,
-                                    gnutls_certificate_type_get(session), ret,
-                                    hostname, strlen(hostname),
-                                    addr, strlen(addr),
-                                    protoname, strlen(protoname), port);
+    int pret = PATROL_GNUTLS_verify_credentials(chain, chain_len,
+                                                gnutls_certificate_type_get(session), ret,
+                                                (gnutls_certificate_credentials_t)
+                                                _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL),
+                                                hostname, strlen(hostname),
+                                                addr, strlen(addr),
+                                                protoname, strlen(protoname), port);
     LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK

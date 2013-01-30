@@ -143,12 +143,23 @@ PATROL_set_pin (const char *host, size_t host_len,
                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
                 int64_t expiry);
 
+PatrolRC
+PATROL_set_pin_level (const char *host, size_t host_len,
+                      const char *proto, size_t proto_len,
+                      uint16_t port, int64_t cert_id,
+                      PatrolPinLevel pin_level,
+                      PatrolData *chain, size_t chain_len);
+
+int
+PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey);
+
 #include <certpatrol/patrol-gnutls.h>
 
 static inline
 PatrolRC
 PATROL_verify (const PatrolData *chain, size_t chain_len,
-               PatrolCertType chain_type, PatrolRC chain_result,
+               PatrolCertType chain_type,
+               PatrolRC chain_result,
                const char *host, size_t host_len,
                const char *addr, size_t addr_len,
                const char *proto, size_t proto_len,

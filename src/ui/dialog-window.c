@@ -464,6 +464,10 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
         gtk_image_set_from_stock(GTK_IMAGE(pv->dane_icon),
                                  (dane_result == DANE_E_SUCCESS)
                                  ? GTK_STOCK_APPLY
+                                 : (dane_result == DANE_E_NO_DANE_DATA)
+                                 ? GTK_STOCK_DIALOG_INFO
+                                 : (dane_status == 0)
+                                 ? GTK_STOCK_DIALOG_WARNING
                                  : GTK_STOCK_DIALOG_ERROR,
                                  GTK_ICON_SIZE_BUTTON);
 

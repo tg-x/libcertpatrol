@@ -18,4 +18,10 @@
 # define LOG_DEBUG(...)
 #endif
 
+#define GNUTLS_CHECK_VERSION(major, minor, patch)                       \
+    (GNUTLS_VERSION_MAJOR > major                                       \
+     || (GNUTLS_VERSION_MAJOR == major && GNUTLS_VERSION_MINOR > minor) \
+     || (GNUTLS_VERSION_MAJOR == major && GNUTLS_VERSION_MINOR == minor \
+         && GNUTLS_VERSION_PATCH >= patch))
+
 #endif

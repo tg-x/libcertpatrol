@@ -329,17 +329,16 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
         gchar *stored_str = g_date_time_format(timestamp, "%Y-%m-%d %H:%M:%S");
         timestamp = g_date_time_new_from_unix_local(time(NULL));
         gchar *expires_str = g_date_time_format(timestamp, "%Y-%m-%d %H:%M:%S");
+        int count = 9;
 
         text = g_strdup_printf(_("<b>Stored Certificate #%d</b>"), idx);
-
         gtk_label_set_markup(GTK_LABEL(title), text);
         gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
         gtk_widget_set_margin_bottom(GTK_WIDGET(title), 2);
         gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
         gtk_widget_show(title);
 
-        text = g_strdup_printf(_("Stored since: %s"), stored_str);
-
+        text = g_strdup_printf(_("View count: %d"), count);
         title = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(title), text);
         gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
@@ -347,8 +346,15 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
         gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
         gtk_widget_show(title);
 
-        text = g_strdup_printf(_("Expires: %s"), expires_str);
+        text = g_strdup_printf(_("Stored since: %s"), stored_str);
+        title = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(title), text);
+        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
+        gtk_widget_set_margin_left(GTK_WIDGET(title), 5);
+        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
+        gtk_widget_show(title);
 
+        text = g_strdup_printf(_("Pin Expires: %s"), expires_str);
         title = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(title), text);
         gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);

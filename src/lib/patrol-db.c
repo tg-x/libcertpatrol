@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
@@ -12,10 +13,13 @@
 int
 PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey)
 {
-    gnutls_pubkey_t pubkey;
-    gnutls_x509_crt_t crt;
+    LOG_DEBUG(">> PATROL_get_pin_level");
+
+    gnutls_pubkey_t pubkey = NULL;
+    gnutls_x509_crt_t crt = NULL;
     size_t i;
     int r;
+    gnutls_global_init();
 
     for (i = 0; i < chain_len; i++) {
         gnutls_x509_crt_init(&crt);
@@ -23,7 +27,7 @@ PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey
         r = gnutls_x509_crt_import(crt, (gnutls_datum_t *) &chain[i],
                                    GNUTLS_X509_FMT_DER);
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error importing cert #%zd: %d", i, r);
+            LOG_ERROR("get_pin_level: error importing cert #%zd: %d", i, r);
             return PATROL_ERROR;
         }
 
@@ -32,7 +36,7 @@ PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey
         gnutls_x509_crt_deinit(crt);
 
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error importing pubkey #%zd: %d", i, r);
+            LOG_ERROR("get_pin_level: error importing pubkey #%zd: %d", i, r);
             gnutls_pubkey_deinit(pubkey);
             return PATROL_ERROR;
         }
@@ -51,7 +55,7 @@ PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey
         gnutls_pubkey_deinit(pubkey);
 
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error exporting pubkey #%zd: %d", i, r);
+            LOG_ERROR("get_pin_level: error exporting pubkey #%zd: %d", i, r);
             gnutls_free(pubkey_der.data);
             return PATROL_ERROR;
         }
@@ -62,7 +66,7 @@ PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey
             return i;
     }
 
-    return -1;
+    return PATROL_ERROR;
 }
 
 PatrolRC
@@ -72,9 +76,12 @@ PATROL_set_pin_level (const char *host, size_t host_len,
                       PatrolPinLevel pin_level,
                       PatrolData *chain, size_t chain_len)
 {
-    PatrolRecord rec;
-    gnutls_pubkey_t pubkey;
-    gnutls_x509_crt_t crt;
+    LOG_DEBUG(">> PATROL_set_pin_level: %.*s, %.*s, %u, %" PRId64 ", %d",
+              (int)host_len, host, (int)proto_len, proto, port, cert_id, pin_level);
+
+    PatrolRecord rec = { 0 };
+    gnutls_pubkey_t pubkey = NULL;
+    gnutls_x509_crt_t crt = NULL;
     size_t i;
     int r;
 
@@ -94,7 +101,7 @@ PATROL_set_pin_level (const char *host, size_t host_len,
         r = gnutls_x509_crt_import(crt, (gnutls_datum_t *) &chain[i],
                                    GNUTLS_X509_FMT_DER);
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error importing cert #%zd: %d", i, r);
+            LOG_ERROR("set_pin_level: error importing cert #%zd: %d", i, r);
             return PATROL_ERROR;
         }
 
@@ -103,12 +110,12 @@ PATROL_set_pin_level (const char *host, size_t host_len,
         gnutls_x509_crt_deinit(crt);
 
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error importing pubkey #%zd: %d", i, r);
+            LOG_ERROR("set_pin_level: error importing pubkey #%zd: %d", i, r);
             gnutls_pubkey_deinit(pubkey);
             return PATROL_ERROR;
         }
 
-        PatrolData pubkey_der;
+        PatrolData pubkey_der = { 0 };
 #if GNUTLS_CHECK_VERSION(3,1,3)
         r = gnutls_pubkey_export2(pubkey, GNUTLS_X509_FMT_DER,
                                   (gnutls_datum_t *) &pubkey_der);
@@ -122,7 +129,7 @@ PATROL_set_pin_level (const char *host, size_t host_len,
         gnutls_pubkey_deinit(pubkey);
 
         if (r != GNUTLS_E_SUCCESS) {
-            LOG_DEBUG(">>> error exporting pubkey #%zd: %d", i, r);
+            LOG_ERROR("set_pin_level: error exporting pubkey #%zd: %d", i, r);
             gnutls_free(pubkey_der.data);
             return PATROL_ERROR;
         }

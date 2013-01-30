@@ -39,17 +39,16 @@ struct _PatrolDialogWindowPrivate {
 };
 
 enum {
-    SIGNAL_ACCEPT,
-    SIGNAL_ACCEPT_ADD,
-    SIGNAL_CONTINUE,
-    SIGNAL_REJECT,
+    SIGNAL_RESPONSE,
     SIGNALS_NUM,
 };
 
 enum {
     COL_NAME,
     COL_PIN,
+    COL_PIN_LEVEL,
     COL_CERT,
+    COL_REC,
     COLS_NUM,
 };
 
@@ -71,8 +70,8 @@ on_accept_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    int sig = self->pv->add ? SIGNAL_ACCEPT_ADD : SIGNAL_ACCEPT;
-    g_signal_emit(self, signals[sig], 0);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0,
+                  self->pv->add ? PATROL_CMD_ACCEPT : PATROL_CMD_ACCEPT_ADD);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -82,7 +81,7 @@ on_continue_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    g_signal_emit(self, signals[SIGNAL_CONTINUE], 0);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_CONTINUE);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -92,7 +91,7 @@ on_reject_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    g_signal_emit(self, signals[SIGNAL_REJECT], 0);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_REJECT);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -264,6 +263,7 @@ on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg)
 static void
 on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg)
 {
+    PatrolDialogRecord *rec;
     GtkTreeModel *tree_model = GTK_TREE_MODEL(arg);
     GtkTreeIter iter, current, child;
     gboolean enabled, valid = TRUE;
@@ -272,38 +272,46 @@ on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg
     gtk_tree_model_get(tree_model, &iter, COL_PIN, &enabled, -1);
 
     if (!enabled) {
-        /* set all other values to FALSE */
+        /* toggle all other radio buttons to off */
         gtk_tree_model_get_iter_first(tree_model, &current);
         while (valid) {
             gtk_tree_store_set(GTK_TREE_STORE(tree_model), &current, COL_PIN, FALSE, -1);
             valid = gtk_tree_model_iter_children(tree_model, &child, &current);
             current = child;
         }
-        /* set radio button to TRUE */
+        /* toggle this radio button to on */
         gtk_tree_store_set(GTK_TREE_STORE(tree_model), &iter, COL_PIN, TRUE, -1);
+
+        gtk_tree_model_get(tree_model, &iter, COL_REC, &rec, -1);
+        gtk_tree_model_get(tree_model, &iter, COL_PIN_LEVEL, &rec->pin_level, -1);
+        rec->pin_changed = TRUE;
+        LOG_DEBUG(">> pin: id: %ld, level: %d", rec->id, rec->pin_level);
     }
 }
 
 static void
-load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
+load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
             guint idx, GtkWidget *container)
 {
     /* build tree model */
     GtkTreeStore *tree_store = gtk_tree_store_new(COLS_NUM, G_TYPE_STRING,
-                                                  G_TYPE_BOOLEAN, G_TYPE_POINTER);
+                                                  G_TYPE_BOOLEAN, G_TYPE_INT,
+                                                  G_TYPE_POINTER, G_TYPE_POINTER);
 
     GtkTreeIter *parent = NULL, iter;
-    gint i, num_certs = gcr_certificate_chain_get_length(chain);
+    gint i, num_certs = gcr_certificate_chain_get_length(rec->chain);
 
     for (i = num_certs - 1; i >= 0; i--) {
-        GcrCertificate *cert = gcr_certificate_chain_get_certificate(chain, i);
+        GcrCertificate *cert = gcr_certificate_chain_get_certificate(rec->chain, i);
         gchar *label = gcr_certificate_get_subject_name(cert);
 
         gtk_tree_store_append(tree_store, &iter, parent);
         gtk_tree_store_set(tree_store, &iter,
                            COL_NAME, label,
-                           COL_PIN, FALSE,
+                           COL_PIN, i == rec->pin_level,
+                           COL_PIN_LEVEL, i,
                            COL_CERT, cert,
+                           COL_REC, rec,
                            -1);
         parent = &iter;
         g_free(label);
@@ -313,82 +321,93 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
     GtkWidget *title_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_box_pack_start(GTK_BOX(container), title_box, FALSE, FALSE, 0);
     gtk_widget_show(title_box);
-    gchar *text;
-    GtkWidget *title = gtk_label_new(NULL);
-    if (idx == 0) {     /* new chain */
-        text = g_strdup_printf(_("<b>New Certificate</b>"));
-        gtk_label_set_markup(GTK_LABEL(title), text);
-        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
-        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
-        gtk_widget_show(title);
+    gchar *text, *str;
+    GtkWidget *label = gtk_label_new(NULL);
 
-        g_free(text);
-    }
-    else {
-        GDateTime *timestamp = g_date_time_new_from_unix_local(time(NULL));
-        gchar *stored_str = g_date_time_format(timestamp, "%Y-%m-%d %H:%M:%S");
-        timestamp = g_date_time_new_from_unix_local(time(NULL));
-        gchar *expires_str = g_date_time_format(timestamp, "%Y-%m-%d %H:%M:%S");
-        int count = 9;
-
-        text = g_strdup_printf(_("<b>Stored Certificate #%d</b>"), idx);
-        gtk_label_set_markup(GTK_LABEL(title), text);
-        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
-        gtk_widget_set_margin_bottom(GTK_WIDGET(title), 2);
-        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
-        gtk_widget_show(title);
-
-        text = g_strdup_printf(_("View count: %d"), count);
-        title = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(title), text);
-        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
-        gtk_widget_set_margin_left(GTK_WIDGET(title), 5);
-        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
-        gtk_widget_show(title);
-
-        text = g_strdup_printf(_("Stored since: %s"), stored_str);
-        title = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(title), text);
-        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
-        gtk_widget_set_margin_left(GTK_WIDGET(title), 5);
-        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
-        gtk_widget_show(title);
-
-        text = g_strdup_printf(_("Pin Expires: %s"), expires_str);
-        title = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(title), text);
-        gtk_widget_set_halign(GTK_WIDGET(title), GTK_ALIGN_START);
-        gtk_widget_set_margin_left(GTK_WIDGET(title), 5);
-        gtk_box_pack_start(GTK_BOX(title_box), title, FALSE, FALSE, 0);
-        gtk_widget_show(title);
-
-        g_free(text);
-        g_free(stored_str);
-        g_free(expires_str);
+    if (idx == 0) {
+        text = g_strdup_printf("<b>%s</b>", _("New Certificate"));
+    } else {
+        text = g_strdup_printf("<b>%s #%d</b>", _("Stored Certificate"), idx);
+        gtk_widget_set_margin_bottom(GTK_WIDGET(label), 2);
     }
 
-    /* build tree viewer */
+    gtk_label_set_markup(GTK_LABEL(label), text);
+    g_free(text);
+    gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
+    gtk_widget_show(label);
+
+    str = g_strdup_printf("%" G_GINT64_FORMAT, rec->count_seen);
+    text = g_strdup_printf(g_dngettext(textdomain(NULL),
+                                       "Seen: %s time", "Seen: %s times",
+                                       rec->count_seen), str);
+    g_free(str);
+    label = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label), text);
+    g_free(text);
+    gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+    gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
+    gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
+    gtk_widget_show(label);
+
+    GDateTime *dtime = g_date_time_new_from_unix_local(rec->first_seen);
+    str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+    //g_object_unref(dtime);
+    text = g_strdup_printf(_("First seen: %s"), str);
+    g_free(str);
+    label = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label), text);
+    g_free(text);
+    gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+    gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
+    gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
+    gtk_widget_show(label);
+
+    if (rec->first_seen != rec->last_seen) {
+        dtime = g_date_time_new_from_unix_local(rec->last_seen);
+        str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+        //g_object_unref(dtime);
+        text = g_strdup_printf(_("Last seen: %s"), str);
+        g_free(str);
+        label = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(label), text);
+        g_free(text);
+        gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+        gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
+        gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
+        gtk_widget_show(label);
+    }
+
+    if (rec->pin_expiry) {
+        dtime = g_date_time_new_from_unix_local(rec->last_seen);
+        str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+        //g_object_unref(dtime);
+        text = g_strdup_printf(_("Pin expiry: %s"), str);
+        g_free(str);
+        label = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(label), text);
+        g_free(text);
+        gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+        gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
+        gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
+        gtk_widget_show(label);
+    }
+
+    /* build tree view */
     GtkWidget *tree_view;
     tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
     gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
-    //if (idx == 0) {
-    //    GtkWidget *frame = gtk_frame_new(NULL);
-    //    gtk_box_pack_start(GTK_BOX(container), frame, FALSE, FALSE, 0);
-    //    gtk_container_add(GTK_CONTAINER(frame), tree_view);
-    //    gtk_widget_show(frame);
-    //}
-    //else
-        gtk_box_pack_start(GTK_BOX(container), tree_view, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(container), tree_view, FALSE, FALSE, 0);
     gtk_widget_show(tree_view);
 
     g_signal_connect(tree_view, "focus-in-event",
-            G_CALLBACK(on_tree_view_focus), self);
+                     G_CALLBACK(on_tree_view_focus), self);
     g_signal_connect(self->pv->renderer, "data-changed",
-            G_CALLBACK(on_cert_changed), tree_view);
-    GtkTreeSelection *tree_sel = 
-            gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
+                     G_CALLBACK(on_cert_changed), tree_view);
+    GtkTreeSelection *tree_sel
+        = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree_view));
     g_signal_connect(tree_sel, "changed", 
-            G_CALLBACK(on_tree_selection_changed), self);
+                     G_CALLBACK(on_tree_selection_changed), self);
 
     if (idx == 0) // new chain
         gtk_tree_selection_select_iter(tree_sel, &iter);
@@ -397,7 +416,8 @@ load_chain (PatrolDialogWindow *self, GcrCertificateChain *chain,
     GtkCellRenderer *tree_renderer = gtk_cell_renderer_text_new();
     GtkTreeViewColumn *tree_column
         = gtk_tree_view_column_new_with_attributes(_("Certificate Hierarchy"),
-                                        tree_renderer, "text", COL_NAME, NULL);
+                                                   tree_renderer, "text",
+                                                   COL_NAME, NULL);
     gtk_tree_view_column_set_expand (tree_column, TRUE);
     gtk_tree_view_insert_column (GTK_TREE_VIEW (tree_view), tree_column, -1);
 
@@ -495,12 +515,9 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
 #endif
 
     GList *item = chains;
-    guint i = 0;
-    while (item) {
+    guint i;
+    for (i = 0; item && item->data; item = item->next, i++)
         load_chain(self, item->data, i, i ? pv->old_chains : pv->new_chain);
-        item = item->next;
-        i++;
-    }
 }
 
 static void
@@ -528,21 +545,9 @@ patrol_dialog_window_class_init (PatrolDialogWindowClass *cls)
 
     g_type_class_add_private(cls, sizeof(PatrolDialogWindow));
 
-    signals[SIGNAL_ACCEPT]
-        = g_signal_new("accept", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
-                       0, NULL, NULL, NULL, G_TYPE_NONE, 0);
-
-    signals[SIGNAL_ACCEPT_ADD]
-        = g_signal_new("accept-add", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
-                       0, NULL, NULL, NULL, G_TYPE_NONE, 0);
-
-    signals[SIGNAL_CONTINUE]
-        = g_signal_new("continue", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
-                       0, NULL, NULL, NULL, G_TYPE_NONE, 0);
-
-    signals[SIGNAL_REJECT]
-        = g_signal_new("reject", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
-                       0, NULL, NULL, NULL, G_TYPE_NONE, 0);
+    signals[SIGNAL_RESPONSE]
+        = g_signal_new("response", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
+                       0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_INT);
 }
 
 PatrolDialogWindow *
@@ -556,4 +561,3 @@ patrol_dialog_window_new (const gchar *host, const gchar *proto,
                               dane_result, dane_status, app_name);
     return self;
 }
-

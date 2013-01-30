@@ -352,7 +352,7 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
 
     GDateTime *dtime = g_date_time_new_from_unix_local(rec->first_seen);
     str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-    //g_object_unref(dtime);
+    g_date_time_unref(dtime);
     text = g_strdup_printf(_("First seen: %s"), str);
     g_free(str);
     label = gtk_label_new(NULL);
@@ -366,7 +366,7 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     if (rec->first_seen != rec->last_seen) {
         dtime = g_date_time_new_from_unix_local(rec->last_seen);
         str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-        //g_object_unref(dtime);
+        g_date_time_unref(dtime);
         text = g_strdup_printf(_("Last seen: %s"), str);
         g_free(str);
         label = gtk_label_new(NULL);
@@ -381,7 +381,7 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     if (rec->pin_expiry) {
         dtime = g_date_time_new_from_unix_local(rec->last_seen);
         str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-        //g_object_unref(dtime);
+        g_date_time_unref(dtime);
         text = g_strdup_printf(_("Pin expiry: %s"), str);
         g_free(str);
         label = gtk_label_new(NULL);

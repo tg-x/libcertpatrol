@@ -18,9 +18,10 @@
 static gchar *host = NULL, *proto = NULL, *app_name = NULL, **args = NULL;
 static guint16 port = 0;
 static gint64 cert_id = -1;
-static gint chain_result = PATROL_ARG_UNKNOWN;
+static gint chain_result = PATROL_ARG_UNKNOWN, chain_status = 0;
 static gint dane_result = PATROL_ARG_UNKNOWN, dane_status = 0;
 static int exit_status = PATROL_CMD_CONTINUE;
+static gboolean edit = false;
 
 static gboolean
 print_version_and_exit (const gchar *option_name, const gchar *value,
@@ -189,6 +190,9 @@ const GOptionEntry options[] = {
     { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
       print_version_and_exit, N_("Show the application's version"), NULL },
 
+    { "edit", 'e', 0, G_OPTION_ARG_NONE, &edit,
+      N_("Edit mode"), NULL },
+
     { "host", 'H', 0, G_OPTION_ARG_STRING, &host,
       N_("Hostname of peer"), NULL },
 
@@ -204,14 +208,17 @@ const GOptionEntry options[] = {
     { "chain-result", 'c', 0, G_OPTION_ARG_INT, &chain_result,
       N_("Chain validation result"), NULL },
 
+    { "chain-status", 'C', 0, G_OPTION_ARG_INT, &chain_status,
+      N_("Chain validation status"), NULL },
+
     { "dane-result", 'd', 0, G_OPTION_ARG_INT, &dane_result,
       N_("DANE validation result"), NULL },
 
     { "dane-status", 'D', 0, G_OPTION_ARG_INT, &dane_status,
       N_("DANE validation status"), NULL },
 
-    { "app-name", 'n', 0, G_OPTION_ARG_STRING, &app_name,
-      N_("Application name - defaults to parent process cmdline"), NULL },
+    //{ "app-name", 'a', 0, G_OPTION_ARG_STRING_ARRAY, &app_name,
+    //  N_("Application name - defaults to parent process cmdline"), NULL },
 
     { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &args,
       NULL, NULL },
@@ -241,6 +248,7 @@ main (int argc, char *argv[])
 
     context = g_option_context_new("");
     g_option_context_set_translation_domain(context, GETTEXT_PACKAGE);
+    g_option_context_set_ignore_unknown_options(context, true);
     g_option_context_add_main_entries(context, options, NULL);
     g_option_context_add_group(context, gtk_get_option_group(TRUE));
 
@@ -254,6 +262,21 @@ main (int argc, char *argv[])
     if (cert_id < 0) {
         printf("%s", g_option_context_get_help(context, TRUE, NULL));
         exit(-1);
+    }
+
+    size_t i, len = 0;
+    for (i = 0; args && args[i]; i++)
+        len += strlen(args[i]) + 1;
+
+    if (len) {
+        app_name = malloc(len);
+        size_t cur = 0;
+        for (i = 0; args && args[i]; i++) {
+            strncpy(app_name + cur, args[i], len - cur);
+            cur += strlen(args[i]);
+            if (cur < len - 1)
+                app_name[cur++] = ' ';
+        }
     }
 
     if (!app_name) {
@@ -271,7 +294,7 @@ main (int argc, char *argv[])
         }
     }
 
-    LOG_DEBUG("app_name = %s", app_name);
+    LOG_DEBUG("app_name = [%s]", app_name);
 
     g_option_context_free(context);
     g_set_application_name(_("Certificate Patrol"));

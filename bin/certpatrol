@@ -10,6 +10,10 @@ if [ -f $user_config ]; then
     source $user_config
 fi
 
+export CERTPATROL_NEW_ACTION CERTPATROL_CHANGE_ACTION \
+       CERTPATROL_NOTIFY_CMD CERTPATROL_DIALOG_CMD \
+       CERTPATROL_IGNORE_LOCAL_RESOLVER
+
 lib=libcertpatrol-preload.so
 
 case "$(uname -s)" in

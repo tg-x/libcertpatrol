@@ -157,10 +157,15 @@ fill_record (sqlite3_stmt *stmt, PatrolRecord *rec)
         } else break;
     }
 
-    rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
-    rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
-    memcpy(rec->pin_pubkey.data, sqlite3_column_blob(stmt, 7),
-           rec->pin_pubkey.size);
+    if (SQLITE_BLOB == sqlite3_column_type(stmt, 7)) {
+        rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
+        rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
+        memcpy(rec->pin_pubkey.data, sqlite3_column_blob(stmt, 7),
+               rec->pin_pubkey.size);
+    } else {
+        rec->pin_pubkey.size = 0;
+        rec->pin_pubkey.data = NULL;
+    }
 
     rec->pin_expiry = sqlite3_column_int64(stmt, 8);
     rec->next = NULL;

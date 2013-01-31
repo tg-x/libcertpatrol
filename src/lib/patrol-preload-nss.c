@@ -20,6 +20,7 @@ SSL_SetURL(PRFileDesc *fd, char *url)
         return SECFailure;
 
     int ret = SetUrl(fd, url);
+    LOG_DEBUG(">>> fd = %zx", (intptr_t) fd);
     LOG_DEBUG(">>> result = %d", ret);
     nss_fd = fd;
     return ret;
@@ -41,5 +42,11 @@ CERT_VerifyCertName(CERTCertificate *cert, const char *hostname)
 
     SECStatus ret = VerifyCertName(cert, hostname);
     LOG_DEBUG(">>> result = %d", ret);
-    return ret;
+
+    PatrolRC r = PATROL_NSS_verify(CERT_GetCertChainFromCert(cert, PR_Now(),
+                                                             certUsageSSLCA),
+                                   ret == SECSuccess ? PATROL_OK : PATROL_ERROR,
+                                   hostname, strlen(hostname), NULL, 0, "tcp", 3, 443);
+
+    return r == PATROL_OK ? SECSuccess : SECFailure;
 }

@@ -5,6 +5,20 @@
 #include <gnutls/x509.h>
 
 PatrolRC
+PATROL_GNUTLS_visit (const gnutls_datum_t *chain, size_t chain_len,
+                     gnutls_certificate_type_t chain_type,
+                     const char *host, size_t host_len,
+                     const char *proto, size_t proto_len,
+                     uint16_t port, PatrolPinLevel pin_level, int64_t *cert_id);
+
+PatrolVerifyRC
+PATROL_GNUTLS_verify_pin (const gnutls_datum_t *chain, size_t chain_len,
+                          gnutls_certificate_type_t chain_type,
+                          const char *host, size_t host_len,
+                          const char *proto, size_t proto_len,
+                          uint16_t port);
+
+PatrolRC
 PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
                       gnutls_certificate_type_t chain_type,
                       //const gnutls_datum_t *ca_list, size_t ca_list_len,

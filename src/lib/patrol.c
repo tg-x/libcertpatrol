@@ -69,7 +69,7 @@ PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                  uint16_t port, int64_t cert_id, int chain_result,
                  int dane_result, int dane_status, const char *app_name,
-                 bool wait)
+                 PatrolEvent event, PatrolAction action)
 {
     pid_t pid = fork();
     if (pid < 0) {
@@ -89,13 +89,14 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
         execlp(cmd, cmd, "--host", host, "--proto", proto, "--port", prt,
                "--id", id, "--chain-result", cres, "--dane-result", dres,
                "--dane-status", dstatus,
-               app_name ? "--app_name" : NULL, app_name,
+               event == PATROL_EVENT_NEW ? "--new" : "--change",
+               app_name ? "--" : NULL, app_name,
                NULL);
         perror("exec");
         _exit(-1);
     }
 
-    if (wait) {
+    if (action != PATROL_ACTION_NOTIFY) {
         int status = 0;
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {

@@ -30,6 +30,25 @@ typedef enum {
 } PatrolStatus;
 
 typedef enum {
+    PATROL_VERIFY_ERROR = -1,
+    PATROL_VERIFY_OK = 0,
+    PATROL_VERIFY_NEW = 1,
+    PATROL_VERIFY_CHANGE = 2,
+} PatrolVerifyRC;
+
+typedef enum {
+    PATROL_EVENT_NONE = 0,
+    PATROL_EVENT_NEW = 1,
+    PATROL_EVENT_CHANGE = 2,
+} PatrolEvent;
+
+typedef enum {
+    PATROL_ACTION_NONE = 0,
+    PATROL_ACTION_NOTIFY = 1,
+    PATROL_ACTION_DIALOG = 2,
+} PatrolAction;
+
+typedef enum {
     PATROL_CMD_ACCEPT = 0,
     PATROL_CMD_ACCEPT_ADD = 1,
     PATROL_CMD_CONTINUE = 2,
@@ -85,7 +104,7 @@ PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                  uint16_t port, int64_t cert_id, int chain_result,
                  int dane_result, int dane_status, const char *app_name,
-                 bool wait);
+                 PatrolEvent event, PatrolAction action);
 
 /** Get stored certificates of a peer.
  *

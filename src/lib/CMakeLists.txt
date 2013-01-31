@@ -54,18 +54,18 @@ endif()
 #### certpatrol-preload ####################################
 
 set(SRC patrol-preload-gnutls.c)
+set(LIB certpatrol certpatrol-gnutls)
 
 if(OPENSSL_LIBRARIES)
    set(SRC ${SRC} patrol-preload-openssl.c)
+   set(LIB ${LIB} certpatrol-openssl)
 endif()
 
 if(NSS_LIBRARIES)
    set(SRC ${SRC} patrol-preload-nss.c)
+   set(LIB ${LIB} certpatrol-nss)
 endif()
 
 add_library(certpatrol-preload SHARED ${SRC})
-target_link_libraries(certpatrol-preload
-    certpatrol
-    certpatrol-gnutls
-)
+target_link_libraries(certpatrol-preload ${LIB})
 install(TARGETS certpatrol-preload DESTINATION lib)

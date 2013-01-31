@@ -1,7 +1,17 @@
-CERTPATROL_NEW_CMD=certpatrol-dialog
-CERTPATROL_NEW_NOTIFY=0
+# CertPatrol configuration
+# $HOME/.certpatrol/config
 
-CERTPATROL_CHANGE_CMD=certpatrol-dialog
-CERTPATROL_CHANGE_NOTIFY=0
+# actions to handle new/change events
+# 0: no action
+# 1: notify
+# 2: dialog
+CERTPATROL_NEW_ACTION=1
+CERTPATROL_CHANGE_ACTION=2
 
+# commands to run on new/change events
+CERTPATROL_NOTIFY_CMD=certpatrol-notify
+CERTPATROL_DIALOG_CMD=certpatrol-dialog
+
+# if your local resolver is not dnssec-ready,
+# set this to 1 to do direct recursive resolution
 CERTPATROL_IGNORE_LOCAL_RESOLVER=0

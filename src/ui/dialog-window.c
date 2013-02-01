@@ -20,8 +20,10 @@ struct _PatrolDialogWindowPrivate {
     const gchar *proto;
     gint16 port;
     GList *chains;
+    PatrolEvent event;
 
-    gboolean add;
+    gboolean add_pin;
+    gboolean all_hostnames;
 
     GtkWidget *msg;
     GtkWidget *icon;
@@ -59,10 +61,17 @@ static guint signals[SIGNALS_NUM];
 G_DEFINE_TYPE(PatrolDialogWindow, patrol_dialog_window, GTK_TYPE_WINDOW);
 
 static void
-on_add_toggled (GtkButton *button, gpointer arg)
+on_add_pin_toggled (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
-    self->pv->add = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+    self->pv->add_pin = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+}
+
+static void
+on_all_hostnames_toggled (GtkButton *button, gpointer arg)
+{
+    PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
+    self->pv->all_hostnames = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
 }
 
 static void
@@ -70,8 +79,8 @@ on_accept_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0,
-                  self->pv->add ? PATROL_CMD_ACCEPT : PATROL_CMD_ACCEPT_ADD);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_ACCEPT,
+                  self->pv->add_pin ? PATROL_PIN_MULTIPLE : PATROL_PIN_EXCLUSIVE);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -81,7 +90,7 @@ on_continue_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_CONTINUE);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_CONTINUE, 0);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -91,7 +100,7 @@ on_reject_clicked (GtkButton *button, gpointer arg)
 {
     PatrolDialogWindow *self = PATROL_DIALOG_WINDOW(arg);
 
-    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_REJECT);
+    g_signal_emit(self, signals[SIGNAL_RESPONSE], 0, PATROL_CMD_REJECT, 0);
 
     gtk_widget_destroy(GTK_WIDGET(self));
 }
@@ -181,12 +190,6 @@ patrol_dialog_window_constructed (GObject *obj)
     
     gtk_box_pack_start(GTK_BOX(details), GTK_WIDGET(pv->viewer), TRUE, TRUE, 0);
 
-    /* additional pin checkbox */
-    GtkWidget *add = gtk_check_button_new_with_mnemonic(
-        _("_Store additional pin instead of replacing existing ones"));
-    g_signal_connect_object(GTK_TOGGLE_BUTTON(add), "toggled",
-                            G_CALLBACK(on_add_toggled), self, 0);
-
     /* button box */
     GtkWidget *bbox = gtk_button_box_new(GTK_ORIENTATION_HORIZONTAL);
     gtk_widget_set_halign(GTK_WIDGET(bbox), GTK_ALIGN_END);
@@ -195,10 +198,27 @@ patrol_dialog_window_constructed (GObject *obj)
     gtk_button_box_set_layout(GTK_BUTTON_BOX(bbox), GTK_BUTTONBOX_END);
 
     gtk_box_pack_end(GTK_BOX(content), bbox, FALSE, FALSE, 12);
-    gtk_box_pack_end(GTK_BOX(content), add, FALSE, FALSE, 0);
+
+    /* accept all checkbox */
+    GtkWidget *btn = gtk_check_button_new_with_mnemonic(
+        _("Pin public key for all _hostnames the certificate is valid for "
+          "(see Subject Name and Subject Alternative Names)"));
+    gtk_widget_set_tooltip_text(btn, "TODO");
+    g_signal_connect_object(GTK_TOGGLE_BUTTON(btn), "toggled",
+                            G_CALLBACK(on_all_hostnames_toggled), self, 0);
+    gtk_box_pack_end(GTK_BOX(content), btn, FALSE, FALSE, 0);
+
+    /* additional pin checkbox */
+    btn = gtk_check_button_new_with_mnemonic(
+        _("_Store additional pin instead of replacing existing ones"));
+    g_signal_connect_object(GTK_TOGGLE_BUTTON(btn), "toggled",
+                            G_CALLBACK(on_add_pin_toggled), self, 0);
+    gtk_box_pack_end(GTK_BOX(content), btn, FALSE, FALSE, 0);
+
+    gtk_box_pack_end(GTK_BOX(content), bbox, FALSE, FALSE, 12);
 
     /* reject button */
-    GtkWidget *btn = gtk_button_new_from_stock(GTK_STOCK_NO);
+    btn = gtk_button_new_from_stock(GTK_STOCK_NO);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Reject"));
     gtk_widget_set_tooltip_text(btn, _("Reject certificate.\nCauses verification failure."));
     gtk_box_pack_start(GTK_BOX(bbox), btn, FALSE, TRUE, 0);
@@ -325,7 +345,9 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     GtkWidget *label = gtk_label_new(NULL);
 
     if (idx == 0) {
-        text = g_strdup_printf("<b>%s</b>", _("New Certificate"));
+        text = (self->pv->event == PATROL_EVENT_NONE)
+            ? g_strdup_printf("<b>%s</b>", _("Selected Certificate"))
+            : g_strdup_printf("<b>%s</b>", _("New Certificate"));
     } else {
         text = g_strdup_printf("<b>%s #%d</b>", _("Stored Certificate"), idx);
         gtk_widget_set_margin_bottom(GTK_WIDGET(label), 2);
@@ -438,30 +460,39 @@ void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                            const gchar *proto, guint16 port, GList *chains,
                            gint chain_result, gint dane_result,
-                           gint dane_status, gchar *app_name)
+                           gint dane_status, gchar *app_name, PatrolEvent event)
 {
     PatrolDialogWindowPrivate *pv = self->pv;
     pv->host = host;
     pv->proto = proto;
     pv->port = port;
     pv->chains = chains;
+    pv->event = event;
 
     if (!chains)
         return;
 
-    /* msg */
+    /* window title */
+    gchar *text = g_strdup_printf("%s - %s:%u (%s)", _("Certificate Patrol"),
+                                  host, port, proto);
+    gtk_window_set_title(GTK_WINDOW(self), text);
+    g_free(text);
+
+    /* message icon & text*/
     gtk_image_set_from_stock(GTK_IMAGE(pv->icon),
                              (g_list_length(chains) > 1)
                              ? GTK_STOCK_DIALOG_WARNING
                              : GTK_STOCK_DIALOG_INFO,
                              GTK_ICON_SIZE_DIALOG);
 
-    gchar *text = g_strdup_printf(
-        g_list_length(chains) > 1
+    text = g_strdup_printf(
+        (event == PATROL_EVENT_NONE)
+        ? _("Stored certificates for peer <b>%s:%u (%s)</b>")
+        : (g_list_length(chains) > 1)
         ? _("<b>Public key change</b> detected for peer <b>%s:%u (%s)</b>\n"
-            "in application <b>%s</b>\n")
+            "in application <b>%s</b>")
         : _("<b>New public key</b> detected for peer <b>%s:%u (%s)</b>\n"
-            "in application <b>%s</b>\n"),
+            "in application <b>%s</b>"),
         host, port, proto, app_name);
     gtk_label_set_markup(GTK_LABEL(pv->msg), text);
     g_free(text);
@@ -530,6 +561,10 @@ patrol_dialog_window_init (PatrolDialogWindow *self)
     pv->proto = NULL;
     pv->port = 0;
     pv->chains = NULL;
+    pv->event = PATROL_EVENT_NONE;
+
+    pv->add_pin = FALSE;
+    pv->all_hostnames = FALSE;
 
     pv->renderer = gcr_certificate_renderer_new(NULL);
     pv->viewer = gcr_viewer_new_scrolled();
@@ -547,17 +582,17 @@ patrol_dialog_window_class_init (PatrolDialogWindowClass *cls)
 
     signals[SIGNAL_RESPONSE]
         = g_signal_new("response", PATROL_TYPE_DIALOG_WINDOW, G_SIGNAL_RUN_LAST,
-                       0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_INT);
+                       0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_INT, G_TYPE_INT);
 }
 
 PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
                           guint16 port, GList *chains,
                           gint chain_result, gint dane_result,
-                          gint dane_status, gchar *app_name)
+                          gint dane_status, gchar *app_name, PatrolEvent event)
 {
     PatrolDialogWindow *self = g_object_new(PATROL_TYPE_DIALOG_WINDOW, NULL);
     patrol_dialog_window_load(self, host, proto, port, chains, chain_result,
-                              dane_result, dane_status, app_name);
+                              dane_result, dane_status, app_name, event);
     return self;
 }

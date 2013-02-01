@@ -20,8 +20,9 @@ static guint16 port = 0;
 static gint64 cert_id = -1;
 static gint chain_result = PATROL_ARG_UNKNOWN, chain_status = 0;
 static gint dane_result = PATROL_ARG_UNKNOWN, dane_status = 0;
-static int exit_status = PATROL_CMD_CONTINUE;
-static gboolean edit = false;
+static PatrolCmdRC exit_status = PATROL_CMD_CONTINUE;
+static gboolean new = false, change = false, edit = false;
+static PatrolPinMode pin_mode = PATROL_PIN_EXCLUSIVE;
 
 static gboolean
 print_version_and_exit (const gchar *option_name, const gchar *value,
@@ -39,9 +40,11 @@ on_window_close (GtkWidget *widget, GList *chains)
 }
 
 static void
-on_window_response (GtkWidget *widget, int status, GList *chains)
+on_window_response (GtkWidget *widget, PatrolCmdRC status, PatrolPinMode pmode,
+                    GList *chains)
 {
     exit_status = status;
+    pin_mode = pmode;
 
     gtk_widget_hide(widget);
     gtk_main_quit();
@@ -76,6 +79,7 @@ load_chain (GcrParser *parser, PatrolRecord *rec, PatrolDialogRecord **drec)
     PatrolDialogRecord *r = g_malloc(sizeof(PatrolDialogRecord));
     r->id = rec->id;
     LOG_DEBUG(">> load_chain: %ld", rec->id);
+    r->status = rec->status;
     r->der_chain = rec->chain;
     r->der_chain_len = rec->chain_len;
     r->first_seen = rec->first_seen;
@@ -180,9 +184,9 @@ store_changed_pins (GList *chains)
     for (i = 0; item && item->data; item = item->next, i++) {
         rec = item->data;
         if (rec->pin_changed)
-            PATROL_set_pin_level(host, strlen(host), proto, strlen(proto), port,
-                                 rec->id, rec->pin_level,
-                                 rec->der_chain, rec->der_chain_len);
+            PATROL_set_pin_from_chain(host, strlen(host), proto, strlen(proto), port,
+                                      rec->id, rec->pin_level,
+                                      rec->der_chain, rec->der_chain_len);
     }
 }
 
@@ -190,8 +194,14 @@ const GOptionEntry options[] = {
     { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
       print_version_and_exit, N_("Show the application's version"), NULL },
 
+    { "new", 'n', 0, G_OPTION_ARG_NONE, &new,
+      N_("New certificate"), NULL },
+
+    { "change", 'x', 0, G_OPTION_ARG_NONE, &change,
+      N_("Changed certificate"), NULL },
+
     { "edit", 'e', 0, G_OPTION_ARG_NONE, &edit,
-      N_("Edit mode"), NULL },
+      N_("Edit certificate"), NULL },
 
     { "host", 'H', 0, G_OPTION_ARG_STRING, &host,
       N_("Hostname of peer"), NULL },
@@ -217,8 +227,8 @@ const GOptionEntry options[] = {
     { "dane-status", 'D', 0, G_OPTION_ARG_INT, &dane_status,
       N_("DANE validation status"), NULL },
 
-    //{ "app-name", 'a', 0, G_OPTION_ARG_STRING_ARRAY, &app_name,
-    //  N_("Application name - defaults to parent process cmdline"), NULL },
+    { "app-name", 'a', 0, G_OPTION_ARG_STRING, &app_name,
+      N_("Application name - defaults to parent process cmdline"), NULL },
 
     { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &args,
       NULL, NULL },
@@ -264,18 +274,20 @@ main (int argc, char *argv[])
         exit(-1);
     }
 
-    size_t i, len = 0;
-    for (i = 0; args && args[i]; i++)
-        len += strlen(args[i]) + 1;
+    if (!app_name) {
+        size_t i, len = 0;
+        for (i = 0; args && args[i]; i++)
+            len += strlen(args[i]) + 1;
 
-    if (len) {
-        app_name = malloc(len);
-        size_t cur = 0;
-        for (i = 0; args && args[i]; i++) {
-            strncpy(app_name + cur, args[i], len - cur);
-            cur += strlen(args[i]);
-            if (cur < len - 1)
-                app_name[cur++] = ' ';
+        if (len) {
+            app_name = malloc(len);
+            size_t cur = 0;
+            for (i = 0; args && args[i]; i++) {
+                strncpy(app_name + cur, args[i], len - cur);
+                cur += strlen(args[i]);
+                if (cur < len - 1)
+                    app_name[cur++] = ' ';
+            }
         }
     }
 
@@ -305,9 +317,14 @@ main (int argc, char *argv[])
     if (!chains)
         exit(-1);
 
+    PatrolEvent event
+        = new ? PATROL_EVENT_NEW
+        : change ? PATROL_EVENT_CHANGE
+        : PATROL_EVENT_NONE;
+
     PatrolDialogWindow *win
         = patrol_dialog_window_new(host, proto, port, chains, chain_result,
-                                   dane_result, dane_status, app_name);
+                                   dane_result, dane_status, app_name, event);
     gtk_widget_show(GTK_WIDGET(win));
 
     g_signal_connect(win, "response", G_CALLBACK(on_window_response), chains);
@@ -316,5 +333,19 @@ main (int argc, char *argv[])
     gtk_main();
 
     store_changed_pins(chains);
+
+    if (edit) {
+        switch (exit_status) {
+        case PATROL_CMD_ACCEPT:
+            PATROL_set_cert_active(host, strlen(host), proto, strlen(proto), port,
+                                   cert_id, pin_mode);
+        case PATROL_CMD_CONTINUE:
+            break;
+        case PATROL_CMD_REJECT:
+            PATROL_set_cert_status(host, strlen(host), proto, strlen(proto), port,
+                                   cert_id, PATROL_STATUS_REJECTED);
+        }
+    }
+
     return exit_status;
 }

@@ -10,6 +10,7 @@
 
 typedef struct {
     gint64 id;
+    PatrolStatus status;
     int pin_level;
     gboolean pin_changed;
     time_t pin_expiry;

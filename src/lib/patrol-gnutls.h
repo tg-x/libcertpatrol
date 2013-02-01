@@ -4,48 +4,39 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 
-PatrolRC
-PATROL_GNUTLS_visit (const gnutls_datum_t *chain, size_t chain_len,
-                     gnutls_certificate_type_t chain_type,
-                     const char *host, size_t host_len,
-                     const char *proto, size_t proto_len,
-                     uint16_t port, PatrolPinLevel pin_level, int64_t *cert_id);
-
-PatrolVerifyRC
-PATROL_GNUTLS_verify_pin (const gnutls_datum_t *chain, size_t chain_len,
-                          gnutls_certificate_type_t chain_type,
-                          const char *host, size_t host_len,
-                          const char *proto, size_t proto_len,
-                          uint16_t port);
-
+static inline
 PatrolRC
 PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
-                      gnutls_certificate_type_t chain_type,
-                      //const gnutls_datum_t *ca_list, size_t ca_list_len,
-                      int chain_result, //unsigned int chain_status,
+                      PatrolCertType chain_type,
+                      PatrolRC chain_result, //unsigned int chain_status,
                       const char *host, size_t host_len,
                       const char *addr, size_t addr_len,
                       const char *proto, size_t proto_len,
-                      uint16_t port);
+                      uint16_t port)
+{
+    return PATROL_GNUTLS_verify((PatrolData *) chain, chain_len, chain_type,
+                                chain_result, host, host_len, addr, addr_len,
+                                proto, proto_len, port);
+}
+
+#if GNUTLS_CHECK_VERSION(3,0,0)
 
 PatrolRC
-PATROL_GNUTLS_verify_trust_list (const gnutls_datum_t *chain, size_t chain_len,
-                                 gnutls_certificate_type_t chain_type,
-                                 int chain_result, //unsigned int chain_status,
-                                 const gnutls_x509_trust_list_t trust_list,
-                                 const char *host, size_t host_len,
-                                 const char *addr, size_t addr_len,
-                                 const char *proto, size_t proto_len,
-                                 uint16_t port);
+PATROL_GNUTLS_complete_chain_from_trust_list (const gnutls_datum_t *chain, size_t chain_len,
+                                              gnutls_certificate_type_t chain_type,
+                                              const gnutls_x509_trust_list_t trust_list,
+                                              gnutls_datum_t **new_chain, size_t *new_chain_len);
 
 PatrolRC
-PATROL_GNUTLS_verify_credentials (const gnutls_datum_t *chain, size_t chain_len,
-                                  gnutls_certificate_type_t chain_type,
-                                  int chain_result, //unsigned int chain_status,
-                                  const gnutls_certificate_credentials_t credentials,
-                                  const char *host, size_t host_len,
-                                  const char *addr, size_t addr_len,
-                                  const char *proto, size_t proto_len,
-                                  uint16_t port);
+PATROL_GNUTLS_complete_chain_from_credentials (const gnutls_datum_t *chain, size_t chain_len,
+                                               gnutls_certificate_type_t chain_type,
+                                               const gnutls_certificate_credentials_t credentials,
+                                               gnutls_datum_t **new_chain, size_t *new_chain_len);
+
+void
+PATROL_GNUTLS_free_completed_chain (gnutls_datum_t *new_chain, size_t new_len,
+                                    size_t old_len);
+
+#endif // 3.0.0
 
 #endif // PATROL_GNUTLS_H

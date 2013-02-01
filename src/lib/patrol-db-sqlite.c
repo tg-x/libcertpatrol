@@ -14,7 +14,7 @@
 #include <libtasn1.h>
 
 #ifdef DEBUG
-//# define DEBUG_DB
+# define DEBUG_DB
 #endif
 
 static sqlite3 *db;
@@ -502,8 +502,8 @@ PATROL_set_cert_status (const char *host, size_t host_len,
 
     PatrolRC ret = PATROL_ERROR;
 
-    if (sqlite3_bind_int(stmt, 1, cert_id) != SQLITE_OK ||
-        sqlite3_bind_int(stmt, 2, status) != SQLITE_OK ||
+    if (sqlite3_bind_int(stmt, 1, status) != SQLITE_OK ||
+        sqlite3_bind_int(stmt, 2, cert_id) != SQLITE_OK ||
         sqlite3_bind_text(stmt, 3, host, host_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_text(stmt, 4, proto, proto_len, SQLITE_STATIC) != SQLITE_OK ||
         sqlite3_bind_int(stmt, 5, port) != SQLITE_OK) {
@@ -631,11 +631,11 @@ PATROL_set_cert_seen (const char *host, size_t host_len,
 }
 
 PatrolRC
-PATROL_set_pin (const char *host, size_t host_len,
-                const char *proto, size_t proto_len,
-                uint16_t port, int64_t cert_id,
-                const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                int64_t pin_expiry)
+PATROL_set_pin_pubkey (const char *host, size_t host_len,
+                       const char *proto, size_t proto_len,
+                       uint16_t port, int64_t cert_id,
+                       const unsigned char *pin_pubkey, size_t pin_pubkey_len,
+                       int64_t pin_expiry)
 {
     if (!db) {
         PATROL_db_open();

@@ -10,7 +10,7 @@
 *orig
 *.cmake
 *.so
-bin
+bin/certpatrol-dialog
 doc/html
 doc/latex
 doc/man

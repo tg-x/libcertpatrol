@@ -5,19 +5,11 @@
 #include <nss.h>
 #include <nss/cert.h>
 
-PatrolRC
-PATROL_NSS_verify (const CERTCertList *chain, PatrolRC chain_result,
-                   const char *host, size_t host_len,
-                   const char *addr, size_t addr_len,
-                   const char *proto, size_t proto_len,
-                   uint16_t port)
+size_t
+PATROL_NSS_convert_chain (const CERTCertList *chain, PatrolData **pchain)
 {
-    LOG_DEBUG(">> verify: %d, %s, %s, %s, %d",
-              chain != NULL, host, addr, proto, port);
-
-    PatrolRC ret = PATROL_ERROR;
     if (!chain)
-        return ret;
+        return 0;
 
     size_t ch_len = 0;
     CERTCertListNode *node;
@@ -34,10 +26,6 @@ PATROL_NSS_verify (const CERTCertList *chain, PatrolRC chain_result,
         ch[i].size = node->cert->derCert.len;
     }
 
-    ret = PATROL_verify(ch, ch_len, chain_result, PATROL_CERT_X509,
-                        host, host_len, addr, addr_len, proto, proto_len,
-                        port);
-
-    free(ch);
-    return ret;
+    *pchain = ch;
+    return ch_len;
 }

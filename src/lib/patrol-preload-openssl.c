@@ -11,6 +11,8 @@
 
 #define PROTONAMELEN 32
 
+static PatrolConfig cfg = { .check = -1 };
+
 /** Get result of peer certificate verification.
  *
  * @return X509_V_OK on success, error codes are documented in openssl-verify(1).
@@ -42,14 +44,24 @@ SSL_get_verify_result (const SSL *ssl)
     uint16_t port;
     char protoname[PROTONAMELEN];
     char addr[INET6_ADDRSTRLEN];
-    if (PATROL_get_peer_addr(fd, &proto, protoname, PROTONAMELEN, &port, addr) != 0)
+    if (0 != PATROL_get_peer_addr(fd, &proto, protoname, PROTONAMELEN, &port, addr))
         return ret;
 
-    int pret = PATROL_OPENSSL_verify(SSL_get_peer_cert_chain(ssl), ret,
-                                     hostname, strlen(hostname),
-                                     addr, strlen(addr),
-                                     protoname, strlen(protoname), port);
+    PATROL_init();
+    if (!cfg.loaded)
+        PATROL_get_config(&cfg);
+
+    PatrolData *chain = NULL;
+    size_t chain_len
+        = PATROL_OPENSSL_convert_chain(SSL_get_peer_cert_chain(ssl), &chain);
+
+    PatrolRC pret = PATROL_check(&cfg, chain, chain_len,
+                                 ret == X509_V_OK ? PATROL_OK : PATROL_ERROR,
+                                 PATROL_CERT_X509, hostname, addr, protoname, port);
     LOG_DEBUG(">>> patrol result = %d", pret);
+
+    PATROL_OPENSSL_free_chain(chain, chain_len);
+    PATROL_deinit();
 
     return pret == PATROL_OK ? X509_V_OK : X509_V_ERR_CERT_UNTRUSTED;
 }

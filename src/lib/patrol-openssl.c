@@ -4,19 +4,11 @@
 
 #include <openssl/ssl.h>
 
-PatrolRC
-PATROL_OPENSSL_verify (const STACK_OF(X509) *chain, PatrolRC chain_result,
-                       const char *host, size_t host_len,
-                       const char *addr, size_t addr_len,
-                       const char *proto, size_t proto_len,
-                       uint16_t port)
+size_t
+PATROL_OPENSSL_convert_chain (const STACK_OF(X509) *chain, PatrolData **pchain)
 {
-    LOG_DEBUG(">> verify: %d, %s, %s, %s, %d",
-              chain != NULL, host, addr, proto, port);
-
-    PatrolRC ret = PATROL_ERROR;
     if (!chain)
-        return ret;
+        return 0;
 
     size_t ch_len = sk_X509_num(chain);
     PatrolData *ch = malloc(ch_len * sizeof(PatrolData));
@@ -28,13 +20,19 @@ PATROL_OPENSSL_verify (const STACK_OF(X509) *chain, PatrolRC chain_result,
         ch[i].size = r >= 0 ? r : 0;
     }
 
-    ret = PATROL_verify(ch, ch_len, chain_result, PATROL_CERT_X509,
-                        host, host_len, addr, addr_len, proto, proto_len,
-                        port);
+    *pchain = ch;
+    return ch_len;
+}
 
-    for (i = 0; i < ch_len; i++)
-        OPENSSL_free(ch[i].data);
-    free(ch);
+void
+PATROL_OPENSSL_free_chain (PatrolData *chain, size_t chain_len)
+{
+    if (!chain_len)
+        return;
 
-    return ret;
+    size_t i;
+    for (i = 0; i < chain_len; i++)
+        OPENSSL_free(chain[i].data);
+
+    free(chain);
 }

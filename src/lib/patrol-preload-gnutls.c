@@ -16,6 +16,8 @@
 #define MAX_SERVER_NAME_SIZE 128
 #define MAX_SERVER_NAME_EXTENSIONS 3
 
+static PatrolConfig cfg = { 0 };
+
 typedef struct {
     uint8_t name[MAX_SERVER_NAME_SIZE];
     unsigned name_length;
@@ -74,15 +76,26 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
                                           PROTONAMELEN, &port, addr))
         return GNUTLS_E_CERTIFICATE_ERROR;
 
-    unsigned int chain_len;
-    const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
-                                                               &chain_len);
+    unsigned int pchain_len = 0;
+    const gnutls_datum_t *pchain = gnutls_certificate_get_peers(session, &pchain_len);
+    size_t chain_len = 0;
+    gnutls_datum_t *chain;
 
-    int pret = PATROL_GNUTLS_verify(chain, chain_len,
-                                    gnutls_certificate_type_get(session), ret,
-                                    hostname, strlen(hostname),
-                                    addr, strlen(addr),
-                                    protoname, strlen(protoname), port);
+    gnutls_certificate_type_t chain_type = gnutls_certificate_type_get(session);
+    gnutls_certificate_credentials_t cred
+        = (gnutls_certificate_credentials_t)
+        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
+
+    PATROL_GNUTLS_complete_chain_from_credentials(pchain, pchain_len,
+                                                  chain_type, cred,
+                                                  &chain, &chain_len);
+
+    if (!cfg.loaded)
+        PATROL_get_config(&cfg);
+
+    int pret
+        = PATROL_check(&cfg, chain, chain_len, chain_type,
+                       ret, hostname, addr, protoname, port);
     LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK
@@ -143,17 +156,26 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
                                           PROTONAMELEN, &port, addr))
         return GNUTLS_E_CERTIFICATE_ERROR;
 
-    unsigned int chain_len = 0;
-    const gnutls_datum_t *chain = gnutls_certificate_get_peers(session,
-                                                               &chain_len);
+    unsigned int pchain_len = 0;
+    const gnutls_datum_t *pchain = gnutls_certificate_get_peers(session, &pchain_len);
+    size_t chain_len = 0;
+    gnutls_datum_t *chain;
 
-    int pret = PATROL_GNUTLS_verify_credentials(chain, chain_len,
-                                                gnutls_certificate_type_get(session), ret,
-                                                (gnutls_certificate_credentials_t)
-                                                _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL),
-                                                hostname, strlen(hostname),
-                                                addr, strlen(addr),
-                                                protoname, strlen(protoname), port);
+    gnutls_certificate_type_t chain_type = gnutls_certificate_type_get(session);
+    gnutls_certificate_credentials_t cred
+        = (gnutls_certificate_credentials_t)
+        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
+
+    PATROL_GNUTLS_complete_chain_from_credentials(pchain, pchain_len,
+                                                  chain_type, cred,
+                                                  &chain, &chain_len);
+
+    if (!cfg.loaded)
+        PATROL_get_config(&cfg);
+
+    int pret
+        = PATROL_check(&cfg, chain, chain_len, chain_type,
+                       ret, hostname, addr, protoname, port);
     LOG_DEBUG(">>> patrol result = %d", pret);
 
     return pret == PATROL_OK

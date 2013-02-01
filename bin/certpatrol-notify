@@ -1,0 +1,44 @@
+#!/bin/sh
+
+args=( "$@" )
+
+while [ $# -gt 0 ]
+do
+    case $1 in
+    -n|--new) new=1;
+            title="New Certificate"
+            msg="New certificate found"
+            ;;
+    -c|--chage) change=1
+            title="Certificate Change"
+            msg="Certificate changed"
+            ;;
+    -H|--host) host="$2"; shift;;
+    -p|--proto) proto="$2"; shift;;
+    -P|--port) port="$2"; shift;;
+    -i|--id) id="$2"; shift;;
+    -c|--chain-result) chain_result="$2"; shift;;
+    -C|--chain-status) chain_status="$2"; shift;;
+    -d|--dane-result) dane_result="$2"; shift;;
+    -D|--dane-status) dane_status="$2"; shift;;
+    -a|--app-name) app_name="$2"; shift;;
+    (--) shift; break;;
+    (*) break;;
+    esac
+    shift
+done
+
+msg="$msg for $host:$port ($proto)"
+
+if [ -z "$app_name" ]; then
+    args=( "${args[*]}" -- $(ps -o args= -p $PPID) )
+fi
+
+echo ">> ${args[*]}"
+
+if which tinynotify-send &>/dev/null; then
+    tinynotify-send "$title" "$msg" -u critical -i dialog-information \
+        -A ":certpatrol-dialog --edit ${args[*]}"
+elif which tinynotify-send &>/dev/null; then
+    notify-send "$title" "$msg" -u critical -i dialog-information
+fi

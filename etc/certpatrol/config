@@ -1,16 +1,24 @@
 # CertPatrol configuration
 # $HOME/.certpatrol/config
 
-# actions to handle new/change events
+# actions to handle events
 # 0: no action
 # 1: notify
 # 2: dialog
+
+# new certificate for peer
 CERTPATROL_NEW_ACTION=1
+# peer certificate changed
 CERTPATROL_CHANGE_ACTION=2
+# peer certificate changed to an already rejected one
+CERTPATROL_REJECT_ACTION=1
 
 # commands to run on new/change events
 CERTPATROL_NOTIFY_CMD=certpatrol-notify
 CERTPATROL_DIALOG_CMD=certpatrol-dialog
+
+# perform DANE checks?
+CERTPATROL_CHECK_DANE=1
 
 # if your local resolver is not dnssec-ready,
 # set this to 1 to do direct recursive resolution

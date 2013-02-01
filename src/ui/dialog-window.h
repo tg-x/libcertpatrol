@@ -37,12 +37,12 @@ PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
                           guint16 port, GList *chains,
                           gint chain_result, gint dane_result,
-                          gint dane_status, gchar *app_name);
+                          gint dane_status, gchar *app_name, PatrolEvent event);
 
 void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                            const gchar *proto, guint16 port, GList *chains,
                            gint chain_result, gint dane_result,
-                           gint dane_status, gchar *app_name);
+                           gint dane_status, gchar *app_name, PatrolEvent event);
 
 #endif

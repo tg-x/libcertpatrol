@@ -131,6 +131,7 @@ patrol_dialog_window_constructed (GObject *obj)
     gtk_box_pack_start(GTK_BOX(msgbox), pv->icon, FALSE, FALSE, 6);
 
     pv->msg = gtk_label_new(NULL);
+    gtk_label_set_line_wrap(GTK_LABEL(pv->msg), TRUE);
     gtk_widget_set_halign(GTK_WIDGET(pv->msg), GTK_ALIGN_START);
     gtk_widget_set_margin_top(GTK_WIDGET(pv->msg), 25);
     gtk_box_pack_start(GTK_BOX(msgbox), pv->msg, FALSE, FALSE, 6);
@@ -338,9 +339,9 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     /* set hierarchy title */
     GtkWidget *title_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_box_pack_start(GTK_BOX(container), title_box, FALSE, FALSE, 0);
-    gtk_widget_show(title_box);
     gchar *text, *str;
     GtkWidget *label = gtk_label_new(NULL);
+    GtkWidget *value;
 
     if (idx == 0) {
         text = (self->pv->event == PATROL_EVENT_NONE)
@@ -355,63 +356,70 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     g_free(text);
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
-    gtk_widget_show(label);
 
+    GtkWidget *subtitle_grid = gtk_grid_new();
+    gtk_widget_set_margin_left(GTK_WIDGET(subtitle_grid), 5);
+    gtk_box_pack_start(GTK_BOX(title_box), subtitle_grid, FALSE, FALSE, 0);
+
+    label = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label), _("Seen: "));
     str = g_strdup_printf("%" G_GINT64_FORMAT, rec->count_seen);
     text = g_strdup_printf(g_dngettext(textdomain(NULL),
-                                       "Seen: %s time", "Seen: %s times",
+                                       "%s time", "%s times",
                                        rec->count_seen), str);
     g_free(str);
-    label = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(label), text);
+    value = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(value), text);
     g_free(text);
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
-    gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
-    gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
-    gtk_widget_show(label);
+    gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
+    gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 0, 1, 1);
 
-    GDateTime *dtime = g_date_time_new_from_unix_local(rec->first_seen);
-    str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-    g_date_time_unref(dtime);
-    text = g_strdup_printf(_("First seen: %s"), str);
-    g_free(str);
     label = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(label), text);
+    gtk_label_set_markup(GTK_LABEL(label), _("First seen: "));
+    GDateTime *dtime = g_date_time_new_from_unix_local(rec->first_seen);
+    text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+    g_date_time_unref(dtime);
+    value = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(value), text);
     g_free(text);
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
-    gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
-    gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
-    gtk_widget_show(label);
+    gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
+    gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 1, 1, 1);
 
     if (rec->first_seen != rec->last_seen) {
-        dtime = g_date_time_new_from_unix_local(rec->last_seen);
-        str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-        g_date_time_unref(dtime);
-        text = g_strdup_printf(_("Last seen: %s"), str);
-        g_free(str);
         label = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(label), text);
+        gtk_label_set_markup(GTK_LABEL(label), _("Last seen: "));
+        dtime = g_date_time_new_from_unix_local(rec->last_seen);
+        text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+        g_date_time_unref(dtime);
+        value = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(value), text);
         g_free(text);
         gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
-        gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
-        gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
-        gtk_widget_show(label);
+        gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
+        gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 2, 1, 1);
+        gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 2, 1, 1);
     }
 
     if (rec->pin_expiry) {
-        dtime = g_date_time_new_from_unix_local(rec->last_seen);
-        str = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-        g_date_time_unref(dtime);
-        text = g_strdup_printf(_("Pin expiry: %s"), str);
-        g_free(str);
         label = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(label), text);
+        gtk_label_set_markup(GTK_LABEL(label), _("Pin expiry: "));
+        dtime = g_date_time_new_from_unix_local(rec->last_seen);
+        text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+        g_date_time_unref(dtime);
+        value = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(value), text);
         g_free(text);
         gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
-        gtk_widget_set_margin_left(GTK_WIDGET(label), 5);
-        gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
-        gtk_widget_show(label);
+        gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
+        gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 3, 1, 1);
+        gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 3, 1, 1);
     }
+
+    gtk_widget_show_all(title_box);
 
     /* build tree view */
     GtkWidget *tree_view;

@@ -34,11 +34,9 @@ if [ -z "$app_name" ]; then
     args=( "${args[*]}" -- $(ps -o args= -p $PPID) )
 fi
 
-echo ">> ${args[*]}"
-
 if which tinynotify-send &>/dev/null; then
     tinynotify-send "$title" "$msg" -u critical -i dialog-information \
         -A ":certpatrol-dialog --edit ${args[*]}"
-elif which tinynotify-send &>/dev/null; then
+elif which notify-send &>/dev/null; then
     notify-send "$title" "$msg" -u critical -i dialog-information
 fi

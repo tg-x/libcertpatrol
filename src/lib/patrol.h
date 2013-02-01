@@ -1,6 +1,14 @@
 #ifndef PATROL_H
 # define PATROL_H
 
+/**
+ * @file certpatrol/patrol.h
+ * @brief Library for public key pinning of TLS certificates
+ *
+ * @defgroup libcertpatrol libcertpatrol
+ * @{
+ */
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -266,5 +274,7 @@ PATROL_set_pin_from_chain (const char *host, size_t host_len,
                            uint16_t port, int64_t cert_id,
                            PatrolPinLevel pin_level,
                            PatrolData *chain, size_t chain_len);
+
+/** @} */
 
 #endif // PATROL_H

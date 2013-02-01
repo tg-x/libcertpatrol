@@ -30,10 +30,6 @@ done
 
 msg="$msg for $host:$port ($proto)"
 
-if [ -z "$app_name" ]; then
-    args=( "${args[*]}" -- $(ps -o args= -p $PPID) )
-fi
-
 if which tinynotify-send &>/dev/null; then
     tinynotify-send "$title" "$msg" -u critical -i dialog-information \
         -A ":certpatrol-dialog --edit ${args[*]}"

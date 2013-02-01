@@ -215,8 +215,6 @@ patrol_dialog_window_constructed (GObject *obj)
                             G_CALLBACK(on_add_pin_toggled), self, 0);
     gtk_box_pack_end(GTK_BOX(content), btn, FALSE, FALSE, 0);
 
-    gtk_box_pack_end(GTK_BOX(content), bbox, FALSE, FALSE, 12);
-
     /* reject button */
     btn = gtk_button_new_from_stock(GTK_STOCK_NO);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Reject"));

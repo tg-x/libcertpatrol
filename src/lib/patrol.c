@@ -190,15 +190,33 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
         snprintf(dres, 7, "%d", dane_result);
         snprintf(dstatus, 7, "%d", dane_status);
         snprintf(id, 21, "%" PRId64, cert_id);
+
+        char *app = (char *) app_name;
+        if (!app_name) {
+            char *cmd = malloc(64);
+            snprintf(cmd, 64, "ps -o args= -p %lu", (unsigned long) getpid());
+            FILE *pipe = popen(cmd, "r");
+            if (pipe) {
+                app = malloc(4096);
+                fgets(app, 4096, pipe);
+                pclose(pipe);
+            }
+            if (!app) {
+                app = malloc(32);
+                snprintf(app, 32, "PID %lu", (unsigned long) getpid());
+            }
+        }
+
         LOG_DEBUG(">> exec_cmd: %s --host %s --proto %s --port %s --id %s "
-                  "--chain-result %s --dane-result %s --dane-status %s",
-                  cmd, host, proto, prt, id, cres, dres, dstatus);
+                  "--chain-result %s --dane-result %s --dane-status %s "
+                  "--%s -- %s",
+                  cmd, host, proto, prt, id, cres, dres, dstatus,
+                  event == PATROL_EVENT_NEW ? "new" : "change", app);
         execlp(cmd, cmd, "--host", host, "--proto", proto, "--port", prt,
                "--id", id, "--chain-result", cres, "--dane-result", dres,
                "--dane-status", dstatus,
                event == PATROL_EVENT_NEW ? "--new" : "--change",
-               app_name ? "--" : NULL, app_name,
-               NULL);
+               "--", app, NULL);
         perror("exec");
         _exit(-1);
     }

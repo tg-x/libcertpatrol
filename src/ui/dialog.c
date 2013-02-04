@@ -15,13 +15,14 @@
 #include <string.h>
 #include <inttypes.h>
 
+static PatrolID cert_id;
+static gchar *cert_id_str = NULL;
 static gchar *host = NULL, *proto = NULL, *app_name = NULL, **args = NULL;
 static guint16 port = 0;
-static gint64 cert_id = -1;
 static gint chain_result = PATROL_ARG_UNKNOWN, chain_status = 0;
 static gint dane_result = PATROL_ARG_UNKNOWN, dane_status = 0;
 static PatrolCmdRC exit_status = PATROL_CMD_CONTINUE;
-static gboolean new = false, change = false, edit = false;
+static gboolean new = false, change = false, reject = false, edit = false;
 static PatrolPinMode pin_mode = PATROL_PIN_EXCLUSIVE;
 
 static gboolean
@@ -75,10 +76,10 @@ on_cert_parsed (GcrParser *parser, gpointer arg)
 PatrolRC
 load_chain (GcrParser *parser, PatrolRecord *rec, PatrolDialogRecord **drec)
 {
+    LOG_DEBUG(">> load_chain");
     size_t i;
     PatrolDialogRecord *r = g_malloc(sizeof(PatrolDialogRecord));
-    r->id = rec->id;
-    LOG_DEBUG(">> load_chain: %ld", rec->id);
+    PATROL_set_id(r->id, rec->id);
     r->status = rec->status;
     r->der_chain = rec->chain;
     r->der_chain_len = rec->chain_len;
@@ -105,10 +106,9 @@ load_chain (GcrParser *parser, PatrolRecord *rec, PatrolDialogRecord **drec)
 }
 
 GList *
-load_chains (gchar *host, gchar *proto, guint16 port, gint64 cert_id)
+load_chains (gchar *host, gchar *proto, guint16 port, PatrolID id)
 {
-    LOG_DEBUG(">> load_certs: %s, %s, %u, %ld",
-              host, proto, port, cert_id);
+    LOG_DEBUG(">> load_chains: %s, %s, %u", host, proto, port);
 
     GtkWidget *dialog;
     PatrolRecord record, *records = NULL, *rec = NULL;
@@ -116,15 +116,18 @@ load_chains (gchar *host, gchar *proto, guint16 port, gint64 cert_id)
     GList *chains = NULL;
     PatrolDialogRecord *drec = NULL;
     GcrParser *parser;
+    char id_str[PATROL_ID_STR_LEN];
 
     // retrieve new certificate for this peer
-    if (PATROL_OK != PATROL_get_cert(host, strlen(host), proto, strlen(proto), 
-                                     port, cert_id, &record)) {
-        dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL,
-                                        GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
-                                        _("Error: can't find certificate #%lld"
-                                          " for peer %s:%u (%s)"),
-                                        (long long int) cert_id, host, port, proto);
+    if (PATROL_OK != PATROL_get_cert(host, proto, port, id, PATROL_STATUS_ANY,
+                                     &record)) {
+        PATROL_get_id_str(id, id_str);
+        dialog
+            = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL,
+                                     GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+                                     _("Error: can't find certificate ID %s\n"
+                                       "for peer %s:%u (%s)"),
+                                     id_str, host, port, proto);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         return NULL;
@@ -138,16 +141,15 @@ load_chains (gchar *host, gchar *proto, guint16 port, gint64 cert_id)
     chains = g_list_prepend(chains, drec);
 
     // retrieve other active certificates for this peer, if any
-    switch (PATROL_get_certs(host, strlen(host), proto, strlen(proto), port,
-                             PATROL_STATUS_ACTIVE, false,
-                             &records, &records_len)) {
+    switch (PATROL_get_certs(host, proto, port,
+                             PATROL_STATUS_ACTIVE,
+                             false, &records, &records_len)) {
     case PATROL_OK: // active certs found for peer
         LOG_DEBUG(">>> certs found");
         for (rec = records; rec; rec = rec->next) {
-            if (rec->id == cert_id)
+            if (0 == PATROL_compare_ids(rec->id, cert_id))
                 continue;
 
-            LOG_DEBUG(">>> cert #%" PRId64, rec->id);
             if (PATROL_OK != load_chain(parser, rec, &drec))
                 goto load_certs_error;
             chains = g_list_prepend(chains, drec);
@@ -184,7 +186,7 @@ store_changed_pins (GList *chains)
     for (i = 0; item && item->data; item = item->next, i++) {
         rec = item->data;
         if (rec->pin_changed)
-            PATROL_set_pin_from_chain(host, strlen(host), proto, strlen(proto), port,
+            PATROL_set_pin_from_chain(host, proto, port,
                                       rec->id, rec->pin_level,
                                       rec->der_chain, rec->der_chain_len);
     }
@@ -200,6 +202,9 @@ const GOptionEntry options[] = {
     { "change", 'x', 0, G_OPTION_ARG_NONE, &change,
       N_("Changed certificate"), NULL },
 
+    { "reject", 'x', 0, G_OPTION_ARG_NONE, &reject,
+      N_("Rejected certificate"), NULL },
+
     { "edit", 'e', 0, G_OPTION_ARG_NONE, &edit,
       N_("Edit certificate"), NULL },
 
@@ -212,7 +217,7 @@ const GOptionEntry options[] = {
     { "port", 'P', 0, G_OPTION_ARG_INT, &port,
       N_("Port number of peer"), NULL },
 
-    { "id", 'i', 0, G_OPTION_ARG_INT64, &cert_id,
+    { "id", 'i', 0, G_OPTION_ARG_STRING, &cert_id_str,
       N_("ID of new certificate"), NULL },
 
     { "chain-result", 'c', 0, G_OPTION_ARG_INT, &chain_result,
@@ -269,10 +274,13 @@ main (int argc, char *argv[])
         return 1;
     }
 
-    if (cert_id < 0) {
+    if (!cert_id_str) {
         printf("%s", g_option_context_get_help(context, TRUE, NULL));
         exit(-1);
     }
+
+    PATROL_init();
+    PATROL_set_id_str(cert_id, cert_id_str);
 
     if (!app_name) {
         size_t i, len = 0;
@@ -320,6 +328,7 @@ main (int argc, char *argv[])
     PatrolEvent event
         = new ? PATROL_EVENT_NEW
         : change ? PATROL_EVENT_CHANGE
+        : reject ? PATROL_EVENT_REJECT
         : PATROL_EVENT_NONE;
 
     PatrolDialogWindow *win
@@ -334,18 +343,16 @@ main (int argc, char *argv[])
 
     store_changed_pins(chains);
 
-    if (edit) {
-        switch (exit_status) {
-        case PATROL_CMD_ACCEPT:
-            PATROL_set_cert_active(host, strlen(host), proto, strlen(proto), port,
-                                   cert_id, pin_mode);
-        case PATROL_CMD_CONTINUE:
-            break;
-        case PATROL_CMD_REJECT:
-            PATROL_set_cert_status(host, strlen(host), proto, strlen(proto), port,
-                                   cert_id, PATROL_STATUS_REJECTED);
-        }
+    switch (exit_status) {
+    case PATROL_CMD_ACCEPT:
+        PATROL_set_cert_active(host, proto, port, cert_id, pin_mode);
+    case PATROL_CMD_CONTINUE:
+        break;
+    case PATROL_CMD_REJECT:
+        PATROL_set_cert_status(host, proto, port, cert_id,
+                               PATROL_STATUS_REJECTED);
     }
 
+    PATROL_deinit();
     return exit_status;
 }

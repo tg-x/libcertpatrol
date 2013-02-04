@@ -13,6 +13,10 @@ do
             title="Certificate Change"
             msg="Certificate changed"
             ;;
+    -r|--reject) reject=1
+            title="Certificate Rejected"
+            msg="Rejected certificate"
+            ;;
     -H|--host) host="$2"; shift;;
     -p|--proto) proto="$2"; shift;;
     -P|--port) port="$2"; shift;;

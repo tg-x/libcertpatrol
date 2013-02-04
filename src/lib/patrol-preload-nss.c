@@ -9,8 +9,8 @@
 #define LIBNSS3 "libnss3.so"
 #define LIBSSL3 "libssl3.so"
 
-static PatrolConfig cfg = { .check = -1 };
-static PRFileDesc *nss_fd = NULL;
+static PatrolConfig cfg;
+static PRFileDesc *nss_fd;
 
 /** Sets the domain name of the intended server in the client's SSL socket. */
 SECStatus

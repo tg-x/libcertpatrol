@@ -19,69 +19,18 @@
 
 static dane_state_t dstate = NULL;
 
-void
+PatrolRC
 PATROL_init ()
 {
     gnutls_global_init();
-}
-
-void
-PATROL_deinit ()
-{
-    gnutls_global_deinit();
+    return PATROL_init_db();
 }
 
 PatrolRC
-PATROL_get_config (PatrolConfig *c)
+PATROL_deinit ()
 {
-    LOG_DEBUG("PATROL_get_config");
-
-    char *buf;
-    buf = getenv("CERTPATROL_NEW_ACTION");
-    if (buf && buf[0] != '\0')
-        c->new_action = atoi(buf);
-    else
-        c->new_action = PATROL_ACTION_NOTIFY;
-
-    buf = getenv("CERTPATROL_CHANGE_ACTION");
-    if (buf && buf[0] != '\0')
-        c->change_action = atoi(buf);
-    else
-        c->change_action = PATROL_ACTION_DIALOG;
-
-    buf = getenv("CERTPATROL_REJECT_ACTION");
-    if (buf && buf[0] != '\0')
-        c->reject_action = atoi(buf);
-    else
-        c->reject_action = PATROL_ACTION_NOTIFY;
-
-    buf = getenv("CERTPATROL_PIN_LEVEL");
-    if (buf && buf[0] != '\0')
-        c->pin_level = atoi(buf);
-    else
-        c->pin_level = PATROL_PIN_END_ENTITY;
-
-    buf = getenv("CERTPATROL_IGNORE_LOCAL_RESOLVER");
-    unsigned int dflags;
-    if (buf && buf[0] == '1' && buf[1] == '\0')
-        dflags = DANE_F_IGNORE_LOCAL_RESOLVER;
-    else
-        dflags = 0;
-
-    if (c->dane_flags != dflags) {
-        c->dane_flags = dflags;
-        dstate = NULL;
-    }
-
-    c->notify_cmd = getenv("CERTPATROL_NOTIFY_CMD");
-    if (c->notify_cmd && c->notify_cmd[0] == '\0')
-        c->notify_cmd = NULL;
-
-    c->dialog_cmd = getenv("CERTPATROL_DIALOG_CMD");
-    if (c->dialog_cmd && c->dialog_cmd[0] == '\0')
-        c->dialog_cmd = NULL;
-
-    return PATROL_OK;
+    gnutls_global_deinit();
+    return PATROL_deinit_db();
 }
 
 PatrolRC
@@ -96,15 +45,13 @@ PATROL_check (const PatrolConfig *cfg,
               chain_len, host, addr, proto, port);
 
     const char *name = host ? host : addr;
-    size_t name_len = host ? strlen(host) : strlen(addr);
-    size_t proto_len = strlen(proto);
     if (!chain_len || !name)
         return PATROL_ERROR;
 
     int dret = 0;
     unsigned int dstatus = 0;
 #ifdef HAVE_GNUTLS_DANE
-    if (cfg->check & PATROL_CHECK_DANE) {
+    if (cfg->check_flags & PATROL_CHECK_DANE) {
         if (!dstate)
             dane_state_init(&dstate, cfg->dane_flags);
         dret = dane_verify_crt(dstate, chain, chain_len, chain_type,
@@ -121,29 +68,40 @@ PATROL_check (const PatrolConfig *cfg,
 
     PatrolEvent event = PATROL_EVENT_NONE;
     PatrolAction action = PATROL_ACTION_NONE;
-    int64_t cert_id = -1;
+    PatrolID id = { 0 };
 
     if (0 > PATROL_add_or_update_cert(chain, chain_len, chain_type,
-                                      name, name_len, proto, proto_len, port,
-                                      cfg->pin_level, &cert_id)) {
+                                      name, proto, port,
+                                      cfg->pin_level, &id)) {
         LOG_DEBUG(">>> error while storing chain");
         return PATROL_ERROR;
     }
 
     switch (PATROL_verify_chain(chain, chain_len, chain_type,
-                                name, name_len, proto, proto_len, port)) {
+                                name, proto, port)) {
     case PATROL_VERIFY_OK:
+        LOG_DEBUG(">>> verify: OK");
         break;
 
     case PATROL_VERIFY_NEW:
+        LOG_DEBUG(">>> verify: NEW");
         event = PATROL_EVENT_NEW;
         if (cfg->new_action || chain_result != PATROL_OK)
             action = cfg->new_action;
+        if (cfg->new_action < PATROL_ACTION_DIALOG)
+            PATROL_set_cert_active(host, proto, port, id, PATROL_PIN_MULTIPLE);
         break;
 
     case PATROL_VERIFY_CHANGE:
+        LOG_DEBUG(">>> verify: CHANGE");
         event = PATROL_EVENT_CHANGE;
         action = cfg->change_action;
+        break;
+
+    case PATROL_VERIFY_REJECT:
+        LOG_DEBUG(">>> verify: REJECT");
+        event = PATROL_EVENT_REJECT;
+        action = cfg->reject_action;
         break;
 
     default:
@@ -155,18 +113,25 @@ PATROL_check (const PatrolConfig *cfg,
     PatrolCmdRC cmd_ret = PATROL_CMD_ACCEPT;
 
     if (action) {
-        cmd = (action == PATROL_ACTION_NOTIFY) ? cfg->notify_cmd : cfg->dialog_cmd;
+        cmd = (action == PATROL_ACTION_NOTIFY)
+            ? cfg->notify_cmd : cfg->dialog_cmd;
         if (cmd)
-            cmd_ret = PATROL_exec_cmd(cmd,
-                                      host, proto, port, cert_id, chain_result,
+            cmd_ret = PATROL_exec_cmd(cmd, host, proto, port, id, chain_result,
                                       dret, dstatus, NULL, event, action);
     }
 
-    switch (cmd_ret) {
-    case PATROL_CMD_CONTINUE:
-    case PATROL_CMD_ACCEPT:
-        return PATROL_OK;
-    case PATROL_CMD_REJECT:
+    switch (event) {
+    case PATROL_EVENT_NEW:
+    case PATROL_EVENT_CHANGE:
+        switch (cmd_ret) {
+        case PATROL_CMD_ACCEPT:
+        case PATROL_CMD_CONTINUE:
+            return PATROL_OK;
+        case PATROL_CMD_REJECT:
+        default:
+            return PATROL_ERROR;
+        }
+    case PATROL_EVENT_REJECT:
     default:
         return PATROL_ERROR;
     }
@@ -174,7 +139,7 @@ PATROL_check (const PatrolConfig *cfg,
 
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
-                 uint16_t port, int64_t cert_id, int chain_result,
+                 uint16_t port, PatrolID id, int chain_result,
                  int dane_result, int dane_status, const char *app_name,
                  PatrolEvent event, PatrolAction action)
 {
@@ -184,12 +149,12 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
         return PATROL_ERROR;
     }
     if (pid == 0) {
-        char id[21], prt[6], cres[7], dres[7], dstatus[7];
+        char prt[6], cres[7], dres[7], dstatus[7], id_str[PATROL_ID_STR_SIZE];
         snprintf(prt, 6, "%u", port);
         snprintf(cres, 7, "%d", chain_result);
         snprintf(dres, 7, "%d", dane_result);
         snprintf(dstatus, 7, "%d", dane_status);
-        snprintf(id, 21, "%" PRId64, cert_id);
+        PATROL_get_id_str(id, id_str);
 
         char *app = (char *) app_name;
         if (!app_name) {
@@ -207,16 +172,29 @@ PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
             }
         }
 
+        const char *ev = NULL;
+        switch (event) {
+        case PATROL_EVENT_NEW:
+            ev = "--new";
+            break;
+        case PATROL_EVENT_CHANGE:
+            ev = "--change";
+            break;
+        case PATROL_EVENT_REJECT:
+            ev = "--reject";
+            break;
+        default:
+            break;
+        }
+
         LOG_DEBUG(">> exec_cmd: %s --host %s --proto %s --port %s --id %s "
                   "--chain-result %s --dane-result %s --dane-status %s "
-                  "--%s -- %s",
-                  cmd, host, proto, prt, id, cres, dres, dstatus,
-                  event == PATROL_EVENT_NEW ? "new" : "change", app);
+                  "%s -- %s",
+                  cmd, host, proto, prt, id_str, cres, dres, dstatus,
+                  ev, app);
         execlp(cmd, cmd, "--host", host, "--proto", proto, "--port", prt,
-               "--id", id, "--chain-result", cres, "--dane-result", dres,
-               "--dane-status", dstatus,
-               event == PATROL_EVENT_NEW ? "--new" : "--change",
-               "--", app, NULL);
+               "--id", id_str, "--chain-result", cres, "--dane-result", dres,
+               "--dane-status", dstatus, ev, "--", app, NULL);
         perror("exec");
         _exit(-1);
     }

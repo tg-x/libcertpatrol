@@ -10,16 +10,15 @@
 #include <gnutls/x509.h>
 #include <gnutls/abstract.h>
 
-/** Verify certificate chain against pin settings.
- */
+#define MAX(a, b) (a >= b ? a : b)
+#define MIN(a, b) (a <= b ? a : b)
+
 PatrolVerifyRC
 PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
                      gnutls_certificate_type_t chain_type,
-                     const char *host, size_t host_len,
-                     const char *proto, size_t proto_len,
-                     uint16_t port)
+                     const char *host, const char *proto, uint16_t port)
 {
-    LOG_DEBUG(">> verify_pin: %zu, %s, %s, %d", chain_len, host, proto, port);
+    LOG_DEBUG(">> verify_chain: %zu, %s, %s, %d", chain_len, host, proto, port);
 
     gnutls_pubkey_t pubkey = { 0 };
     gnutls_x509_crt_t crt = { 0 };
@@ -27,19 +26,17 @@ PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
     size_t i, records_len = 0;
     int r;
 
-    // TODO: check if rejected
+    PatrolVerifyRC ret = PATROL_VERIFY_NEW;
 
-    PatrolRC ret = PATROL_get_certs(host, host_len, proto, proto_len, port,
-                                    PATROL_STATUS_ACTIVE, false,
-                                    &records, &records_len);
-    switch (ret) {
+    switch (PATROL_get_certs(host, proto, port,
+                             PATROL_STATUS_ACTIVE | PATROL_STATUS_REJECTED,
+                             false, &records, &records_len)) {
     case PATROL_DONE: // no active certs found for peer
         LOG_DEBUG(">>> new cert");
-        return PATROL_VERIFY_NEW;
+        return ret;
 
     case PATROL_OK: // active cert(s) found for peer
         LOG_DEBUG(">>> cert found");
-        ret = PATROL_VERIFY_CHANGE;
 
         // make a list of pubkeys present in the chain
         size_t pubkey_list_len = chain_len;
@@ -84,18 +81,21 @@ PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
         // compare active pubkeys with pubkeys in the chain
         rec = records;
         do {
-            if (rec->status != PATROL_STATUS_ACTIVE)
-                continue;
-
+            if (rec->status == PATROL_STATUS_ACTIVE)
+                ret = PATROL_VERIFY_CHANGE;
             for (i = 0; i < pubkey_list_len; i++) {
                 if (pubkey_list[i].size == rec->pin_pubkey.size
                     && 0 == memcmp(pubkey_list[i].data, rec->pin_pubkey.data,
                                    pubkey_list[i].size)) {
-                    ret = PATROL_VERIFY_OK;
+                    ret = (rec->status == PATROL_STATUS_ACTIVE)
+                        ? PATROL_VERIFY_OK
+                        : PATROL_VERIFY_REJECT;
                     break;
                 }
             }
-        } while ((rec = rec->next) != NULL && ret != PATROL_OK);
+        } while ((rec = rec->next) != NULL
+                 && ret != PATROL_VERIFY_NEW
+                 && ret != PATROL_VERIFY_REJECT);
 
         for (i = 0; i < pubkey_list_len; i++)
             free(pubkey_list[i].data);
@@ -112,25 +112,26 @@ PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
 PatrolRC
 PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
                            gnutls_certificate_type_t chain_type,
-                           const char *host, size_t host_len,
-                           const char *proto, size_t proto_len,
+                           const char *host,
+                           const char *proto,
                            uint16_t port, PatrolPinLevel pin_level,
-                           int64_t *cert_id)
+                           PatrolID *id)
 {
-    LOG_DEBUG(">> visit: %zu, %s, %s, %d", chain_len, host, proto, port);
+    LOG_DEBUG(">> add_or_update_cert: %zu, %s, %s, %d", chain_len, host, proto, port);
 
     int r;
     gnutls_pubkey_t pubkey = { 0 };
     gnutls_x509_crt_t crt = { 0 };
     unsigned int i;
 
-    PatrolRC ret = PATROL_add_cert(host, host_len, proto, proto_len, port,
-                                   PATROL_STATUS_INACTIVE, chain, chain_len,
-                                   NULL, 0, 0, cert_id);
+    PatrolRC ret = PATROL_add_cert(host, proto, port, PATROL_STATUS_INACTIVE,
+                                   chain, chain_len, NULL, 0, 0, id);
     switch (ret) {
     case PATROL_OK: // cert is newly added, add pin on default level
+        LOG_DEBUG(">>> added NEW");
         for (i = 0; i < chain_len; i++) {
-            if (!(pin_level == i || pin_level == i - chain_len))
+            if (!(i == MIN(pin_level, chain_len - 1)
+                  || i == MAX(chain_len + pin_level, 0)))
                 continue;
 
             gnutls_x509_crt_init(&crt);
@@ -172,10 +173,10 @@ PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
                                                          &expiration, &critical);
             LOG_DEBUG(">>> private key expiry: %ld", expiration);
 #endif
-            if (0 >= PATROL_set_pin_pubkey(host, host_len, proto, proto_len,
-                                           port, *cert_id, pubkey_der.data,
-                                           pubkey_der.size, expiration)) {
-                LOG_DEBUG(">>> error pinning pubkey");
+            if (PATROL_OK != PATROL_set_pin_pubkey(host, proto, port, *id,
+                                                   pubkey_der.data, pubkey_der.size,
+                                                   expiration)) {
+                LOG_DEBUG(">>> error while pinning pubkey");
                 return PATROL_ERROR;
             }
 
@@ -187,12 +188,12 @@ PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
         return ret;
 
     case PATROL_DONE: // cert is already stored, mark it as seen
-        PATROL_set_cert_seen(host, host_len, proto, proto_len, port,
-                             *cert_id);
+        LOG_DEBUG(">>> found EXISTING");
+        PATROL_set_cert_seen(host, proto, port, *id);
         return ret;
 
     default:
-        LOG_DEBUG(">>> error adding cert");
+        LOG_DEBUG(">>> error while adding cert");
         return PATROL_ERROR;
     }
 }
@@ -200,7 +201,7 @@ PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
 int
 PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey)
 {
-    LOG_DEBUG(">> PATROL_get_pin_level");
+    LOG_DEBUG(">> get_pin_level");
 
     gnutls_pubkey_t pubkey = NULL;
     gnutls_x509_crt_t crt = NULL;
@@ -257,14 +258,12 @@ PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey
 }
 
 PatrolRC
-PATROL_set_pin_from_chain (const char *host, size_t host_len,
-                           const char *proto, size_t proto_len,
-                           uint16_t port, int64_t cert_id,
-                           PatrolPinLevel pin_level,
+PATROL_set_pin_from_chain (const char *host, const char *proto, uint16_t port,
+                           PatrolID id, PatrolPinLevel pin_level,
                            PatrolData *chain, size_t chain_len)
 {
-    LOG_DEBUG(">> PATROL_set_pin_level: %.*s, %.*s, %u, %" PRId64 ", %d",
-              (int)host_len, host, (int)proto_len, proto, port, cert_id, pin_level);
+    LOG_DEBUG(">> set_pin_from_chain: %s, %s, %u, %d",
+              host, proto, port, pin_level);
 
     PatrolRecord rec = { 0 };
     gnutls_pubkey_t pubkey = NULL;
@@ -273,14 +272,16 @@ PATROL_set_pin_from_chain (const char *host, size_t host_len,
     int r;
 
     if (!chain_len) {
-        if (PATROL_OK != PATROL_get_cert(host, host_len, proto, proto_len, port, cert_id, &rec))
+        if (PATROL_OK != PATROL_get_cert(host, proto, port, id,
+                                         PATROL_STATUS_ANY, &rec))
             return PATROL_ERROR;
         chain = rec.chain;
         chain_len = rec.chain_len;
     }
 
     for (i = 0; i < chain_len; i++) {
-        if (!(pin_level == i || pin_level == i - chain_len))
+        if (!(i == MIN(pin_level, chain_len - 1)
+              || i == MAX(chain_len + pin_level, 0)))
             continue;
 
         gnutls_x509_crt_init(&crt);
@@ -321,7 +322,7 @@ PATROL_set_pin_from_chain (const char *host, size_t host_len,
             return PATROL_ERROR;
         }
 
-        PATROL_set_pin_pubkey(host, host_len, proto, proto_len, port, cert_id,
+        PATROL_set_pin_pubkey(host, proto, port, id,
                               pubkey_der.data, pubkey_der.size, 0);
 
         gnutls_free(pubkey_der.data);

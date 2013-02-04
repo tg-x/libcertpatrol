@@ -11,7 +11,7 @@
 
 #define PROTONAMELEN 32
 
-static PatrolConfig cfg = { .check = -1 };
+static PatrolConfig cfg;
 
 /** Get result of peer certificate verification.
  *

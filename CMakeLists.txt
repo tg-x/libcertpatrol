@@ -5,29 +5,58 @@ set(VERSION_MINOR 1)
 set(VERSION_PATCH 0)
 set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 
-if(NOT CMAKE_BUILD_TYPE)
-  SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
-    "Choose the type of build, options are: None Debug Release RelWithDebInfo." FORCE)
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
+      "Choose the type of build, options are: None Debug Release RelWithDebInfo." FORCE)
 endif()
 
-set(CMAKE_C_FLAGS "-Wall" CACHE STRING
+set(CMAKE_C_FLAGS "-Wall -std=gnu99" CACHE STRING
     "Common C flags" FORCE)
-set(CMAKE_C_FLAGS_DEBUG "-ggdb -O0 -DDEBUG" CACHE STRING
+set(CMAKE_C_FLAGS_DEBUG "-g -ggdb -O0 -DDEBUG" CACHE STRING
     "C flags for debug build" FORCE)
-set(CMAKE_C_FLAGS_RELWITHDEBINFO "-ggdb -O2" CACHE STRING
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -ggdb -O2" CACHE STRING
     "C flags for release with debug info" FORCE)
 set(CMAKE_C_FLAGS_RELEASE "-O2" CACHE STRING
     "C flags for release" FORCE)
+set(DB_BACKEND "auto" CACHE STRING
+    "Database backend: auto / dconf / sqlite")
 
 include(FindPkgConfig)
-pkg_check_modules(PKG_LIBTASN1 libtasn1 REQUIRED)
+
 pkg_check_modules(PKG_GNUTLS gnutls REQUIRED)
 pkg_check_modules(PKG_GNUTLS_DANE gnutls-dane)
 pkg_check_modules(PKG_OPENSSL openssl)
 pkg_check_modules(PKG_NSS nss)
-pkg_check_modules(PKG_SQLITE sqlite3 REQUIRED)
+
 pkg_check_modules(PKG_GTK gtk+-3.0 REQUIRED)
 pkg_check_modules(PKG_GCR gcr-3 REQUIRED)
+
+pkg_check_modules(PKG_DCONF dconf)
+pkg_check_modules(PKG_UUID uuid)
+
+pkg_check_modules(PKG_SQLITE sqlite3)
+pkg_check_modules(PKG_LIBTASN1 libtasn1)
+
+set(DCONF_INCLUDE_DIRS ${PKG_DCONF_INCLUDE_DIRS} CACHE STRING
+    "dconf include dirs")
+set(DCONF_LIBDIR ${PKG_DCONF_LIBDIR} CACHE STRING
+    "dconf lib dir")
+set(DCONF_LIBRARIES ${PKG_DCONF_LIBRARIES} CACHE STRING
+    "dconf libraries")
+
+set(UUID_INCLUDE_DIRS ${PKG_UUID_INCLUDE_DIRS} CACHE STRING
+    "uuid include dirs")
+set(UUID_LIBDIR ${PKG_UUID_LIBDIR} CACHE STRING
+    "uuid lib dir")
+set(UUID_LIBRARIES ${PKG_UUID_LIBRARIES} CACHE STRING
+    "uuid libraries")
+
+set(SQLITE_INCLUDE_DIRS ${PKG_SQLITE_INCLUDE_DIRS} CACHE STRING
+    "SQLite include dirs")
+set(SQLITE_LIBDIR ${PKG_SQLITE_LIBDIR} CACHE STRING
+    "SQLite lib dir")
+set(SQLITE_LIBRARIES ${PKG_SQLITE_LIBRARIES} CACHE STRING
+    "SQLite libraries")
 
 set(LIBTASN1_INCLUDE_DIRS ${PKG_LIBTASN1_INCLUDE_DIRS} CACHE STRING
     "libtasn1 include dirs")
@@ -64,13 +93,6 @@ set(NSS_LIBDIR ${PKG_NSS_LIBDIR} CACHE STRING
 set(NSS_LIBRARIES ${PKG_NSS_LIBRARIES} CACHE STRING
     "NSS libraries")
 
-set(SQLITE_INCLUDE_DIRS ${PKG_SQLITE_INCLUDE_DIRS} CACHE STRING
-    "SQLite include dirs")
-set(SQLITE_LIBDIR ${PKG_SQLITE_LIBDIR} CACHE STRING
-    "SQLite lib dir")
-set(SQLITE_LIBRARIES ${PKG_SQLITE_LIBRARIES} CACHE STRING
-    "SQLite libraries")
-
 set(GTK_INCLUDE_DIRS ${PKG_GTK_INCLUDE_DIRS} CACHE STRING
     "GTK include dirs")
 set(GTK_LIBDIR ${PKG_GTK_LIBDIR} CACHE STRING
@@ -85,24 +107,76 @@ set(GCR_LIBDIR ${PKG_GCR_LIBDIR} CACHE STRING
 set(GCR_LIBRARIES ${PKG_GCR_LIBRARIES} CACHE STRING
     "Gcr libraries")
 
+if (DB_BACKEND STREQUAL "auto")
+  if (DCONF_LIBRARIES AND UUID_LIBRARIES)
+    set(DB_BACKEND "dconf")
+
+  elseif (SQLITE_LIBRARIES AND LIBTASN1_LIBRARIES)
+    set(DB_BACKEND "sqlite")
+
+  else ()
+    message(FATAL_ERROR "Missing libraries:\n"
+      "Either dconf and uuid, or sqlite and libtasn1 is required.")
+  endif ()
+endif ()
+
+if (DB_BACKEND STREQUAL "dconf")
+  if (NOT DCONF_LIBRARIES)
+    message(FATAL_ERROR "Missing library: dconf is required.\n")
+  endif ()
+
+  if (NOT UUID_LIBRARIES)
+    message(FATAL_ERROR "Missing library: uuid is required.\n")
+  endif ()
+
+  set(SQLITE_LIBRARIES "")
+  set(LIBTASN1_LIBRARIES "")
+
+elseif (DB_BACKEND STREQUAL "sqlite")
+  if (NOT SQLITE_LIBRARIES)
+    message(FATAL_ERROR "Missing library: sqlite is required.\n")
+  endif ()
+
+  if (NOT LIBTASN1_LIBRARIES)
+    message(FATAL_ERROR "Missing library: libtasn1 is required.\n")
+  endif ()
+
+  set(DCONF_LIBRARIES "")
+  set(UUID_LIBRARIES "")
+endif ()
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/include
+
     ${GNUTLS_INCLUDE_DIRS}
     ${GNUTLS_DANE_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
     ${NSS_INCLUDE_DIRS}
+
+    ${DCONF_INCLUDE_DIRS}
+    ${UUID_INCLUDE_DIRS}
+
     ${SQLITE_INCLUDE_DIRS}
+    ${LIBTASN1_INCLUDE_DIRS}
+
     ${GTK_INCLUDE_DIRS}
     ${GCR_INCLUDE_DIRS}
 )
 link_directories(
     ${CMAKE_SOURCE_DIR}/lib
+
     ${GNUTLS_LIBDIR}
     ${GNUTLS_DANE_LIBDIR}
     ${OPENSSL_LIBDIR}
     ${NSS_LIBDIR}
+
+    ${DCONF_LIBDIR}
+    ${UUID_LIBDIR}
+
     ${SQLITE_LIBDIR}
+    ${LIBASN1_LIBDIR}
+
     ${GTK_LIBDIR}
     ${GCR_LIBDIR}
 )
@@ -137,34 +211,34 @@ check_include_file("unistd.h" HAVE_UNISTD_H)
 
 string(TOLOWER ${CMAKE_SYSTEM_NAME} OS)
 
-if(${OS} MATCHES "^linux")
+if (${OS} MATCHES "^linux")
     set(LINUX 1)
-elseif(${OS} MATCHES "darwin|rhapsody|macosx")
+elseif (${OS} MATCHES "darwin|rhapsody|macosx")
     set(OSX 1)
-elseif(${OS} MATCHES "^freebsd")
+elseif (${OS} MATCHES "^freebsd")
     set(SOMEBSD 1)
     set(FREEBSD 1)
-elseif(${OS} MATCHES "^openbsd")
+elseif (${OS} MATCHES "^openbsd")
     set(SOMEBSD 1)
     set(OPENBSD 1)
-elseif(${OS} MATCHES "^netbsd")
+elseif (${OS} MATCHES "^netbsd")
     set(SOMEBSD 1)
     set(NETBSD 1)
-elseif(${OS} MATCHES "solaris")
+elseif (${OS} MATCHES "solaris")
     set(SOLARIS 1)
     set(_REENTRANT 1)
-elseif(${OS} MATCHES "arm-linux")
+elseif (${OS} MATCHES "arm-linux")
     set(LINUX 1)
 elseif(${OS} MATCHES "cygwin")
     set(CYGWIN 1)
     set(WINDOWS 1)
-elseif(${OS} MATCHES "mingw")
+elseif (${OS} MATCHES "mingw")
     set(MINGW 1)
     set(WINDOWS 1)
     set(_WIN32 1)
-else()
+else ()
     set(OTHEROS 1)
-endif()
+endif ()
 
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/lib")
@@ -178,9 +252,19 @@ configure_file(Doxyfile.in Doxyfile @ONLY IMMEDIATE)
 
 add_subdirectory(src)
 
-file(GLOB_RECURSE headers RELATIVE ${CMAKE_SOURCE_DIR} "include/*.h")
-foreach(h ${headers})
-    GET_FILENAME_COMPONENT(f ${h} REALPATH)
-    GET_FILENAME_COMPONENT(d ${h} PATH)
+file(GLOB_RECURSE paths RELATIVE ${CMAKE_SOURCE_DIR} "include/*.h")
+foreach(p ${paths})
+    get_filename_component(f ${p} REALPATH)
+    get_filename_component(d ${p} PATH)
+#    install(FILES ${f} DESTINATION ${d})
+endforeach()
+
+file(GLOB_RECURSE paths RELATIVE ${CMAKE_SOURCE_DIR} "etc/*")
+foreach(p ${paths})
+    get_filename_component(f ${p} REALPATH)
+    get_filename_component(d ${p} PATH)
+    if (CMAKE_INSTALL_PREFIX MATCHES "^/usr/?$")
+      set(d "/${d}")
+    endif()
     install(FILES ${f} DESTINATION ${d})
 endforeach()

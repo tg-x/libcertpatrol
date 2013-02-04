@@ -304,7 +304,6 @@ on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg
         gtk_tree_model_get(tree_model, &iter, COL_REC, &rec, -1);
         gtk_tree_model_get(tree_model, &iter, COL_PIN_LEVEL, &rec->pin_level, -1);
         rec->pin_changed = TRUE;
-        LOG_DEBUG(">> pin: id: %ld, level: %d", rec->id, rec->pin_level);
     }
 }
 
@@ -344,9 +343,18 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     GtkWidget *value;
 
     if (idx == 0) {
-        text = (self->pv->event == PATROL_EVENT_NONE)
-            ? g_strdup_printf("<b>%s</b>", _("Selected Certificate"))
-            : g_strdup_printf("<b>%s</b>", _("New Certificate"));
+        switch (self->pv->event) {
+        case  PATROL_EVENT_NEW:
+        case  PATROL_EVENT_CHANGE:
+            text = g_strdup_printf("<b>%s</b>", _("New Certificate"));
+            break;
+        case  PATROL_EVENT_REJECT:
+            text = g_strdup_printf("<b>%s</b>", _("Rejected Certificate"));
+            break;
+        default:
+            text = g_strdup_printf("<b>%s</b>", _("Selected Certificate"));
+            break;
+        }
     } else {
         text = g_strdup_printf("<b>%s #%d</b>", _("Stored Certificate"), idx);
         gtk_widget_set_margin_bottom(GTK_WIDGET(label), 2);

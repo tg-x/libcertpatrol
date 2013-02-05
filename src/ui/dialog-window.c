@@ -501,11 +501,13 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
 
     text = g_strdup_printf(
         (event == PATROL_EVENT_NONE)
-        ? _("Stored certificates for peer <b>%s:%u (%s)</b>")
+        ? _("Pinned public keys for peer <b>%s:%u (%s)</b>")
+        : (((PatrolDialogRecord *)(chains->data))->status == PATROL_STATUS_REJECTED)
+        ? _("Rejected public key encountered for peer <b>%s:%u (%s)</b>")
         : (g_list_length(chains) > 1)
-        ? _("<b>Public key change</b> detected for peer <b>%s:%u (%s)</b>\n"
+        ? _("<b>Public key change</b> encountered for peer <b>%s:%u (%s)</b>\n"
             "in application <b>%s</b>")
-        : _("<b>New public key</b> detected for peer <b>%s:%u (%s)</b>\n"
+        : _("<b>New public key</b> encountered for peer <b>%s:%u (%s)</b>\n"
             "in application <b>%s</b>"),
         host, port, proto, app_name);
     gtk_label_set_markup(GTK_LABEL(pv->msg), text);

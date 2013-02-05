@@ -165,17 +165,9 @@ PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
                 return PATROL_ERROR;
             }
 
-            time_t expiration = 0;
-#if GNUTLS_CHECK_VERSION(3,1,6)
-            time_t activation = 0;
-            unsigned int critical;
-            gnutls_x509_crt_get_private_key_usage_period(crt, &activation,
-                                                         &expiration, &critical);
-            LOG_DEBUG(">>> private key expiry: %ld", expiration);
-#endif
             if (PATROL_OK != PATROL_set_pin_pubkey(host, proto, port, *id,
-                                                   pubkey_der.data, pubkey_der.size,
-                                                   expiration)) {
+                                                   pubkey_der.data,
+                                                   pubkey_der.size, 0)) {
                 LOG_DEBUG(">>> error while pinning pubkey");
                 return PATROL_ERROR;
             }

@@ -121,6 +121,8 @@ PATROL_check (const PatrolConfig *cfg,
     }
 
     switch (event) {
+    case PATROL_EVENT_NONE:
+        return PATROL_OK;
     case PATROL_EVENT_NEW:
     case PATROL_EVENT_CHANGE:
         switch (cmd_ret) {

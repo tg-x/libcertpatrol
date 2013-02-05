@@ -363,9 +363,9 @@ PATROL_get_cert (const char *host, const char *proto, uint16_t port,
     }
 
     val = read_val_type(host, proto, port, id,
-                        "count_seen", G_VARIANT_TYPE_INT64);
+                        "count_seen", G_VARIANT_TYPE_UINT64);
     if (val) {
-        rec->count_seen = g_variant_get_int64(val);
+        rec->count_seen = g_variant_get_uint64(val);
         g_variant_unref(val);
     }
 

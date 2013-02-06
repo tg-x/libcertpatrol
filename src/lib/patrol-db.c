@@ -94,7 +94,7 @@ PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
                 }
             }
         } while ((rec = rec->next) != NULL
-                 && ret != PATROL_VERIFY_NEW
+                 && ret != PATROL_VERIFY_OK
                  && ret != PATROL_VERIFY_REJECT);
 
         for (i = 0; i < pubkey_list_len; i++)

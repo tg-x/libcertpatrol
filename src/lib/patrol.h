@@ -38,30 +38,48 @@ typedef enum {
     PATROL_STATUS_ANY = 0xff,
 } PatrolStatus;
 
+/// The result of PATROL_verify_chain()
 typedef enum {
+    /// An error occured during verification.
     PATROL_VERIFY_ERROR = -1,
+    /// A matching public key was found in an active entry.
     PATROL_VERIFY_OK = 0,
+    /// No active or rejected entry was found for the peer.
     PATROL_VERIFY_NEW = 1,
+    /// No matching public key was found in an active entry.
     PATROL_VERIFY_CHANGE = 2,
+    /// A matching public key was found in a rejected entry.
     PATROL_VERIFY_REJECT = 3,
 } PatrolVerifyRC;
 
+/// Events depending on the result of PATROL_verify_chain()
 typedef enum {
+    /// A matching public key was found.
     PATROL_EVENT_NONE = 0,
+    /// New public key encountered.
     PATROL_EVENT_NEW = 1,
+    /// Public key change encountered.
     PATROL_EVENT_CHANGE = 2,
+    /// Rejected public key encountered.
     PATROL_EVENT_REJECT = 3,
 } PatrolEvent;
 
 typedef enum {
+    /// Do nothing.
     PATROL_ACTION_NONE = 0,
+    /// Show a notification.
     PATROL_ACTION_NOTIFY = 1,
+    /// Show a dialog.
     PATROL_ACTION_DIALOG = 2,
 } PatrolAction;
 
+/// Return values of the dialog command.
 typedef enum {
+    /// Temporarily accept public key, but do not pin it.
     PATROL_CMD_CONTINUE = 0,
+    /// Accept and pin public key.
     PATROL_CMD_ACCEPT = 1,
+    /// Reject certificate.
     PATROL_CMD_REJECT = 2,
 } PatrolCmdRC;
 

@@ -318,9 +318,10 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *r,
 
     GtkTreeIter *parent = NULL, iter;
     gint i, num_certs = gcr_certificate_chain_get_length(r->chain);
+    GcrCertificate *cert = NULL;
 
     for (i = num_certs - 1; i >= 0; i--) {
-        GcrCertificate *cert = gcr_certificate_chain_get_certificate(r->chain, i);
+        cert = gcr_certificate_chain_get_certificate(r->chain, i);
         gchar *label = gcr_certificate_get_subject_name(cert);
 
         gtk_tree_store_append(tree_store, &iter, parent);
@@ -365,51 +366,87 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *r,
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(title_box), label, FALSE, FALSE, 0);
 
-    GtkWidget *subtitle_grid = gtk_grid_new();
-    gtk_widget_set_margin_left(GTK_WIDGET(subtitle_grid), 5);
-    gtk_box_pack_start(GTK_BOX(title_box), subtitle_grid, FALSE, FALSE, 0);
+    GtkWidget *grid = gtk_grid_new();
+    gtk_widget_set_margin_left(GTK_WIDGET(grid), 5);
+    gtk_box_pack_start(GTK_BOX(title_box), grid, FALSE, FALSE, 0);
 
     label = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(label), _("Seen: "));
+    gtk_label_set_text(GTK_LABEL(label), _("Seen: "));
     str = g_strdup_printf("%" G_GINT64_FORMAT, r->rec.count_seen);
     text = g_strdup_printf(g_dngettext(textdomain(NULL),
                                        "%s time", "%s times",
                                        r->rec.count_seen), str);
     g_free(str);
     value = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(value), text);
+    gtk_label_set_text(GTK_LABEL(value), text);
     g_free(text);
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
     gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
-    gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 0, 1, 1);
-    gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), value, 1, 0, 1, 1);
 
     label = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(label), _("First seen: "));
+    gtk_label_set_text(GTK_LABEL(label), _("First seen: "));
     GDateTime *dtime = g_date_time_new_from_unix_local(r->rec.first_seen);
-    text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+    text = g_date_time_format(dtime, "%c");
     g_date_time_unref(dtime);
     value = gtk_label_new(NULL);
-    gtk_label_set_markup(GTK_LABEL(value), text);
+    gtk_label_set_text(GTK_LABEL(value), text);
     g_free(text);
     gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
     gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
-    gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 1, 1, 1);
-    gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), label, 0, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(grid), value, 1, 1, 1, 1);
 
     if (r->rec.first_seen != r->rec.last_seen) {
         label = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(label), _("Last seen: "));
+        gtk_label_set_text(GTK_LABEL(label), _("Last seen: "));
         dtime = g_date_time_new_from_unix_local(r->rec.last_seen);
-        text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
+        text = g_date_time_format(dtime, "%c");
         g_date_time_unref(dtime);
         value = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(value), text);
+        gtk_label_set_text(GTK_LABEL(value), text);
         g_free(text);
         gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
         gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
-        gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 2, 1, 1);
-        gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 2, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), label, 0, 2, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), value, 1, 2, 1, 1);
+    }
+
+    if (cert) {
+        label = gtk_label_new(NULL);
+        gtk_label_set_text(GTK_LABEL(label), _("Validity: "));
+
+        GDate *expiry = gcr_certificate_get_expiry_date(cert);
+        GDate *now = g_date_new();
+        g_date_set_time_t(now, time(NULL));
+        gint diff = g_date_days_between(now, expiry);
+        g_date_free(now);
+        g_date_free(expiry);
+
+        if (diff > 0) {
+            text = g_strdup_printf(g_dngettext(textdomain(NULL),
+                                               "Certificate is valid for %d more day",
+                                               "Certificate is valid for %d more days",
+                                               diff), diff);
+        } else if (diff < 0) {
+            diff = abs(diff);
+            text = g_strdup_printf(g_dngettext(textdomain(NULL),
+                                               "Certificate <b>expired</b> %d day ago",
+                                               "Certificate <b>expired</b> %d days ago",
+                                               diff), diff);
+        } else {
+            text = g_strdup_printf("Certificate expires today");
+        }
+
+        value = gtk_label_new(NULL);
+        gtk_label_set_markup(GTK_LABEL(value), text);
+        g_free(text);
+
+        gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
+        gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
+        gtk_grid_attach(GTK_GRID(grid), label, 0, 3, 1, 1);
+        gtk_grid_attach(GTK_GRID(grid), value, 1, 3, 1, 1);
     }
 
     gtk_widget_show_all(title_box);

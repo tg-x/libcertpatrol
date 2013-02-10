@@ -202,11 +202,13 @@ PATROL_get_config (PatrolConfig *c)
     else
         c->check_flags = PATROL_DEFAULT_CHECK_FLAGS;
 
+#ifdef HAVE_GNUTLS_DANE
     buf = getenv("CERTPATROL_IGNORE_LOCAL_RESOLVER");
     if (buf && buf[0] == '1' && buf[1] == '\0')
         c->dane_flags = DANE_F_IGNORE_LOCAL_RESOLVER;
     else
         c->dane_flags = PATROL_DEFAULT_DANE_FLAGS;
+#endif
 
     c->notify_cmd = getenv("CERTPATROL_NOTIFY_CMD");
     if (!c->notify_cmd || c->notify_cmd[0] == '\0')

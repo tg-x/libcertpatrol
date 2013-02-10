@@ -57,7 +57,7 @@ endif ()
 
 #### certpatrol-preload ####################################
 
-set(SRC patrol-preload-gnutls.c)
+set(SRC patrol-preload.c patrol-preload-gnutls.c)
 set(LIB certpatrol certpatrol-gnutls)
 
 if (OPENSSL_LIBRARIES)

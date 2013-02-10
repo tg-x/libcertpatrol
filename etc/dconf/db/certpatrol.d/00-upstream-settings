@@ -1,0 +1,18 @@
+# This file is a part of the CertPatrol packaging and should not be changed.
+#
+# Instead create your own file next to it with a higher numbered prefix,
+# and run
+#
+#       dconf update
+#
+
+[system/tls/certpatrol/config]
+new-action=@u 1
+change-action=@u 2
+reject-action=@u 1
+notify-cmd='certpatrol-notify'
+dialog-cmd='certpatrol-dialog'
+pin-level=1
+update-seen=1
+check-dane=true
+dane-ignore-local-resolver=false

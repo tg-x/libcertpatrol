@@ -9,17 +9,10 @@
 #define PATROL_ARG_UNKNOWN G_MAXINT
 
 typedef struct {
-    PatrolStatus status;
-    int pin_level;
     gboolean pin_changed;
-    time_t pin_expiry;
-    time_t first_seen;
-    time_t last_seen;
-    gint64 count_seen;
-    PatrolData *der_chain;
-    size_t der_chain_len;
+    int pin_level;
     GcrCertificateChain *chain;
-    PatrolID id;
+    PatrolRecord rec;
 } PatrolDialogRecord;
 
 #endif

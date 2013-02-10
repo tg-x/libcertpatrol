@@ -5,6 +5,8 @@
 
 #include <nss.h>
 #include <nss/cert.h>
+#include <nspr/prio.h>
+#include <nspr/prnetdb.h>
 
 #define LIBNSS3 "libnss3.so"
 #define LIBSSL3 "libssl3.so"
@@ -51,15 +53,21 @@ CERT_VerifyCertName(CERTCertificate *cert, const char *hostname)
     if (!cfg.loaded)
         PATROL_get_config(&cfg);
 
+    PRNetAddr addr;
+    if (PR_SUCCESS != PR_GetPeerName(nss_fd, &addr))
+        return ret;
+
     PatrolData *chain = NULL;
     size_t chain_len
         = PATROL_NSS_convert_chain(CERT_GetCertChainFromCert(cert, PR_Now(),
                                                              certUsageSSLCA),
                                    &chain);
 
-    PatrolRC pret = PATROL_check(&cfg, chain, chain_len,
+    PatrolRC pret = PATROL_check(&cfg, chain, chain_len, PATROL_CERT_X509,
                                  ret == SECSuccess ? PATROL_OK : PATROL_ERROR,
-                                 PATROL_CERT_X509, hostname, 0, "tcp", 443); // FIXME
+                                 hostname, 0, "tcp", // FIXME
+                                 PR_ntohs((addr.raw.family == PR_AF_INET6)
+                                          ? addr.ipv6.port : addr.inet.port));
     LOG_DEBUG(">>> patrol result = %d", pret);
 
     free(chain);

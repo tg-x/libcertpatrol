@@ -32,7 +32,7 @@ typedef enum {
 } PatrolPinLevel;
 
 typedef enum {
-    PATROL_STATUS_INACTIVE = 1,
+    PATROL_STATUS_INACTIVE = 1 << 0,
     PATROL_STATUS_ACTIVE   = 1 << 1,
     PATROL_STATUS_REJECTED = 1 << 2,
     PATROL_STATUS_ANY = 0xff,
@@ -52,18 +52,6 @@ typedef enum {
     PATROL_VERIFY_REJECT = 3,
 } PatrolVerifyRC;
 
-/// Events depending on the result of PATROL_verify_chain()
-typedef enum {
-    /// A matching public key was found.
-    PATROL_EVENT_NONE = 0,
-    /// New public key encountered.
-    PATROL_EVENT_NEW = 1,
-    /// Public key change encountered.
-    PATROL_EVENT_CHANGE = 2,
-    /// Rejected public key encountered.
-    PATROL_EVENT_REJECT = 3,
-} PatrolEvent;
-
 typedef enum {
     /// Do nothing.
     PATROL_ACTION_NONE = 0,
@@ -75,24 +63,24 @@ typedef enum {
 
 /// Return values of the dialog command.
 typedef enum {
+    /// No return value, perform configured action.
+    PATROL_CMD_NONE = 0,
     /// Temporarily accept public key, but do not pin it.
-    PATROL_CMD_CONTINUE = 0,
+    PATROL_CMD_CONTINUE = 1,
     /// Accept and pin public key.
-    PATROL_CMD_ACCEPT = 1,
+    PATROL_CMD_ACCEPT = 2,
     /// Reject certificate.
-    PATROL_CMD_REJECT = 2,
+    PATROL_CMD_REJECT = 3,
 } PatrolCmdRC;
 
 typedef enum {
-    PATROL_CERT_UNKNOWN = 0,
-    PATROL_CERT_X509 = 1,
-    PATROL_CERT_OPENPGP = 2,
-    PATROL_CERT_RAW = 3
-} PatrolCertType;
+    PATROL_CONFIG_NONE = 0,
+    PATROL_CONFIG_UPDATE_SEEN = 1 << 0,
+} PatrolConfigFlag;
 
 typedef enum {
     PATROL_CHECK_NONE = 0,
-    PATROL_CHECK_DANE = 1 << 1,
+    PATROL_CHECK_DANE = 1 << 0,
 } PatrolCheckFlag;
 
 typedef struct {
@@ -108,6 +96,8 @@ typedef struct {
     char *dialog_cmd;
     /// Default pin level.
     PatrolPinLevel pin_level;
+    /// Update last_seen and seen_count values.
+    unsigned int flags;
     /// Check flags.
     unsigned int check_flags;
     /// DANE flags.
@@ -122,11 +112,19 @@ typedef struct {
 #define PATROL_DEFAULT_NOTIFY_CMD	"certpatrol-notify"
 #define PATROL_DEFAULT_DIALOG_CMD	"certpatrol-dialog"
 #define PATROL_DEFAULT_PIN_LEVEL	PATROL_PIN_ISSUER
+#define PATROL_DEFAULT_FLAGS		0
 #define PATROL_DEFAULT_CHECK_FLAGS	PATROL_CHECK_DANE
 #define PATROL_DEFAULT_DANE_FLAGS	0
 
+typedef enum {
+    PATROL_CERT_UNKNOWN = GNUTLS_CRT_UNKNOWN,
+    PATROL_CERT_X509 = GNUTLS_CRT_X509,
+    PATROL_CERT_OPENPGP = GNUTLS_CRT_OPENPGP,
+    PATROL_CERT_RAW = GNUTLS_CRT_RAW,
+} PatrolCertType;
+
+
 typedef gnutls_datum_t PatrolData;
-typedef gnutls_certificate_type_t PatrolChainType;
 
 #define PATROL_DATA(_data, _size)               \
     (PatrolData) {                              \
@@ -154,10 +152,10 @@ struct PatrolRecord {
     PatrolData *chain;
     /// Length of certificate chain.
     size_t chain_len;
+    /// Type of certificates in the chain.
+    PatrolCertType chain_type;
     /// Pinned public key.
-    PatrolData pin_pubkey;
-    /// Expiry of pin.
-    int64_t pin_expiry;
+    PatrolData pubkey;
     /// Next record.
     PatrolRecord *next;
     /// ID of peer certificate.
@@ -196,7 +194,7 @@ PATROL_get_config (PatrolConfig *c);
 PatrolRC
 PATROL_check (const PatrolConfig *cfg,
               const PatrolData *chain, size_t chain_len,
-              PatrolChainType chain_type,
+              PatrolCertType chain_type,
               int chain_result, //unsigned int chain_status,
               const char *host, const char *addr, const char *proto,
               uint16_t port);
@@ -213,20 +211,15 @@ PATROL_check (const PatrolConfig *cfg,
 PatrolCmdRC
 PATROL_exec_cmd (const char *cmd, const char *host, const char *proto,
                  uint16_t port, PatrolID id, int chain_result,
-                 int dane_result, int dane_status, const char *app_name,
-                 PatrolEvent event, PatrolAction action);
-
-int
-PATROL_get_peer_addr (int fd, int *proto,
-                      char *protoname, size_t protonamelen,
-                      uint16_t *port, char *addrstr);
+                 int dane_result, const char *app_name,
+                 PatrolVerifyRC result, PatrolAction action);
 
 /** Get stored certificates of a peer.
  *
- * @param host		Hostname
- * @param proto		Protocol.
+ * @param host		Host name.
+ * @param proto		Transport protocol.
  * @param port		Port number.
- * @param wildcard	Include wildcard hostnames?
+ * @param wildcard	Include wildcard host names?
  * @param status	Certificate status.
  * @param certs		Certificates (return).
  * @param certs_len	Length of certificates (return).
@@ -236,19 +229,23 @@ PATROL_get_certs (const char *host, const char *proto, uint16_t port,
                   PatrolStatus status, bool wildcard,
                   PatrolRecord **records, size_t *records_len);
 
-/** Get stored certificate of a peer by ID.
+/** Get stored certificate record of a peer by ID.
  */
 PatrolRC
 PATROL_get_cert (const char *host, const char *proto, uint16_t port,
                  PatrolID id, PatrolStatus status, PatrolRecord *rec);
 
-/** Add certificate for a peer.
+/** Add certificate for a peer if it has not yet been added.
+ *
+ * @return PATROL_OK on success, PATROL_DONE when a cert already exists,
+ *         PATROL_ERROR on error.
  */
 PatrolRC
 PATROL_add_cert (const char *host, const char *proto, uint16_t port,
-                 PatrolStatus status, const PatrolData *chain, size_t chain_len,
-                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                 int64_t pin_expiry, PatrolID *id);
+                 PatrolStatus status, const PatrolData *chain,
+                 size_t chain_len, PatrolCertType chain_type,
+                 const unsigned char *pubkey, size_t pubkey_len,
+                 PatrolID *id);
 
 /** Get status of certificate for a peer.
  */
@@ -276,50 +273,36 @@ PATROL_set_cert_seen (const char *host, const char *proto, uint16_t port,
 
 /** Set pinned public key for peer.
  *
- * @param host		Hostname
- * @param proto		Protocol.
+ * @param host		Host name.
+ * @param proto		Transport protocol.
  * @param port		Port number.
  * @param pubkey	DER-encoded public key.
- * @param expiry	Expiry of pin.
  */
 PatrolRC
-PATROL_set_pin_pubkey (const char *host, const char *proto, uint16_t port,
-                       PatrolID id, const unsigned char *pin_pubkey,
-                       size_t pin_pubkey_len, int64_t expiry);
+PATROL_set_pubkey (const char *host, const char *proto, uint16_t port,
+                   PatrolID id, const unsigned char *pubkey, size_t pubkey_len);
 
-/** Verify certificate chain against stored pin settings.
+/** Verify certificate chain against stored pinned public keys.
  */
 PatrolVerifyRC
-PATROL_verify_chain (const gnutls_datum_t *chain, size_t chain_len,
-                     gnutls_certificate_type_t chain_type,
+PATROL_verify_chain (const PatrolData *chain, size_t chain_len,
+                     PatrolCertType chain_type,
                      const char *host, const char *proto, uint16_t port);
 
-/** Store chain or mark it as seen.
+/** Get pin level of public key from certificate chain.
  *
- * - If the peer does not have an entry with the end entity certificate
- *   in the chain (chain[0]), then add a new inactive entry.
- * - If an entry already exists, update its seen count and last seen values.
- */
-PatrolRC
-PATROL_add_or_update_cert (const PatrolData *chain, size_t chain_len,
-                           gnutls_certificate_type_t chain_type,
-                           const char *host, const char *proto, uint16_t port,
-                           PatrolPinLevel pin_level, PatrolID *id);
-
-/** Get pin level of pubkey from chain.
- *
- * @returns The index of certificate in the chain which contains the pubkey.
+ * @returns The index of certificate in the chain which contains the public key.
  */
 int
-PATROL_get_pin_level (PatrolData *chain, size_t chain_len, PatrolData pin_pubkey);
+PATROL_get_pin_level (const PatrolData *chain, size_t chain_len,
+                      PatrolData pubkey);
 
 /** Set pinned pubkey from chain at level.
  */
 PatrolRC
-PATROL_set_pin_from_chain (const char *host, const char *proto, uint16_t port,
-                           PatrolID id, PatrolPinLevel pin_level,
-                           PatrolData *chain, size_t chain_len);
-
+PATROL_set_pubkey_from_chain (const char *host, const char *proto, uint16_t port,
+                              PatrolID id, PatrolPinLevel pin_level,
+                              const PatrolData *chain, size_t chain_len);
 /** @} */
 
 #endif // PATROL_H

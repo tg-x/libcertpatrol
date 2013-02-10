@@ -80,8 +80,7 @@ PATROL_init_db ()
 
                        "CREATE TABLE IF NOT EXISTS certs ("
                        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                       "  cert BLOB UNIQUE, ca_chain BLOB, "
-                       "  pin_pubkey BLOB, pin_expiry INTEGER"
+                       "  cert BLOB UNIQUE, ca_chain BLOB, pubkey BLOB "
                        ");"
 
                        "CREATE TABLE IF NOT EXISTS peers ("
@@ -269,16 +268,15 @@ fill_record (sqlite3_stmt *stmt, PatrolRecord *rec)
     }
 
     if (SQLITE_BLOB == sqlite3_column_type(stmt, 7)) {
-        rec->pin_pubkey.size = sqlite3_column_bytes(stmt, 7);
-        rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
-        memcpy(rec->pin_pubkey.data, sqlite3_column_blob(stmt, 7),
-               rec->pin_pubkey.size);
+        rec->pubkey.size = sqlite3_column_bytes(stmt, 7);
+        rec->pubkey.data = malloc(rec->pubkey.size);
+        memcpy(rec->pubkey.data, sqlite3_column_blob(stmt, 7),
+               rec->pubkey.size);
     } else {
-        rec->pin_pubkey.size = 0;
-        rec->pin_pubkey.data = NULL;
+        rec->pubkey.size = 0;
+        rec->pubkey.data = NULL;
     }
 
-    rec->pin_expiry = sqlite3_column_int64(stmt, 8);
     rec->next = NULL;
 
     return PATROL_OK;
@@ -300,7 +298,7 @@ PATROL_get_certs (const char *host, const char *proto, uint16_t port,
         sqlite3_prepare_v2(
             db,
             C2ARG("SELECT cert_id, status, first_seen, last_seen, count_seen, "
-                  "       cert, ca_chain, pin_pubkey, pin_expiry "
+                  "       cert, ca_chain, pubkey "
                   "FROM peers "
                   "INNER JOIN certs ON cert_id = id "
                   "WHERE status & ? AND port = ? AND proto = ? AND host = ? "
@@ -311,7 +309,7 @@ PATROL_get_certs (const char *host, const char *proto, uint16_t port,
         sqlite3_prepare_v2(
             db,
             C2ARG("SELECT cert_id, status, first_seen, last_seen, count_seen, "
-                  "       cert, ca_chain, pin_pubkey, pin_expiry "
+                  "       cert, ca_chain, pubkey "
                   "FROM peers "
                   "INNER JOIN certs ON cert_id = id "
                   "WHERE status & ? AND port = ? AND proto = ? AND (host = ? OR host = '*' || ?) "
@@ -387,7 +385,7 @@ PATROL_get_cert (const char *host, const char *proto, uint16_t port,
         sqlite3_prepare_v2(
             db,
             C2ARG("SELECT cert_id, status, first_seen, last_seen, count_seen, "
-                  "       cert, ca_chain, pin_pubkey, pin_expiry "
+                  "       cert, ca_chain, pubkey "
                   "FROM peers "
                   "INNER JOIN certs ON cert_id = id "
                   "WHERE cert_id = ? AND status & ? AND port = ? AND proto = ? AND host = ? "),
@@ -429,8 +427,8 @@ PATROL_get_cert (const char *host, const char *proto, uint16_t port,
 PatrolRC
 PATROL_add_cert (const char *host, const char *proto, uint16_t port,
                  PatrolStatus status, const PatrolData *chain, size_t chain_len,
-                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                 int64_t pin_expiry, PatrolID *id)
+                 PatrolCertType chain_type,
+                 const unsigned char *pubkey, size_t pubkey_len, PatrolID *id)
 {
     if (!db) {
         PATROL_init_db();
@@ -452,8 +450,8 @@ PATROL_add_cert (const char *host, const char *proto, uint16_t port,
     if (!stmt_ins_cert)
         sqlite3_prepare_v2(
             db,
-            C2ARG("INSERT INTO certs (cert, ca_chain, pin_pubkey, pin_expiry) "
-                  "VALUES (?, ?, ?, ?)"),
+            C2ARG("INSERT INTO certs (cert, ca_chain, pubkey) "
+                  "VALUES (?, ?, ?)"),
             &stmt_ins_cert, NULL);
     if (!stmt_ins_peer)
         sqlite3_prepare_v2(
@@ -523,8 +521,7 @@ PATROL_add_cert (const char *host, const char *proto, uint16_t port,
 
         if (sqlite3_bind_blob(stmt_ins_cert, 1, chain[0].data, chain[0].size, SQLITE_STATIC) != SQLITE_OK ||
             sqlite3_bind_blob(stmt_ins_cert, 2, ca_chain, ca_chain_len, SQLITE_STATIC) != SQLITE_OK ||
-            sqlite3_bind_blob(stmt_ins_cert, 3, pin_pubkey, pin_pubkey_len, SQLITE_STATIC) != SQLITE_OK ||
-            sqlite3_bind_int64(stmt_ins_cert, 4, pin_expiry) != SQLITE_OK) {
+            sqlite3_bind_blob(stmt_ins_cert, 3, pubkey, pubkey_len, SQLITE_STATIC) != SQLITE_OK) {
 
             LOG_ERROR("add_cert: ins cert bind: %s (#%d)", sqlite3_errmsg(db), sqlite3_errcode(db));
             goto add_cert_end;
@@ -743,9 +740,9 @@ PATROL_set_cert_seen (const char *host, const char *proto,
 }
 
 PatrolRC
-PATROL_set_pin_pubkey (const char *host, const char *proto, uint16_t port,
-                       PatrolID id, const unsigned char *pin_pubkey,
-                       size_t pin_pubkey_len, int64_t pin_expiry)
+PATROL_set_pubkey (const char *host, const char *proto, uint16_t port,
+                   PatrolID id, const unsigned char *pubkey,
+                   size_t pubkey_len)
 {
     if (!db) {
         PATROL_init_db();
@@ -758,7 +755,7 @@ PATROL_set_pin_pubkey (const char *host, const char *proto, uint16_t port,
         sqlite3_prepare_v2(
             db,
             C2ARG("UPDATE certs "
-                  "SET pin_pubkey = ?, pin_expiry = ? "
+                  "SET pubkey = ? "
                   "WHERE id = ? "
                   "  AND 1 <= (SELECT count(*) FROM peers "
                   "            WHERE cert_id = ? AND host = ? "
@@ -768,15 +765,14 @@ PATROL_set_pin_pubkey (const char *host, const char *proto, uint16_t port,
 
     int ret = PATROL_ERROR;
 
-    if (sqlite3_bind_blob(stmt, 1, pin_pubkey, pin_pubkey_len, SQLITE_STATIC) != SQLITE_OK ||
-        sqlite3_bind_int64(stmt, 2, pin_expiry) != SQLITE_OK ||
+    if (sqlite3_bind_blob(stmt, 1, pubkey, pubkey_len, SQLITE_STATIC) != SQLITE_OK ||
+        sqlite3_bind_int64(stmt, 2, get_id(id)) != SQLITE_OK ||
         sqlite3_bind_int64(stmt, 3, get_id(id)) != SQLITE_OK ||
-        sqlite3_bind_int64(stmt, 4, get_id(id)) != SQLITE_OK ||
-        sqlite3_bind_text(stmt, 5, host, strlen(host), SQLITE_STATIC) != SQLITE_OK ||
-        sqlite3_bind_text(stmt, 6, proto, strlen(proto), SQLITE_STATIC) != SQLITE_OK ||
-        sqlite3_bind_int(stmt, 7, port) != SQLITE_OK) {
+        sqlite3_bind_text(stmt, 4, host, strlen(host), SQLITE_STATIC) != SQLITE_OK ||
+        sqlite3_bind_text(stmt, 5, proto, strlen(proto), SQLITE_STATIC) != SQLITE_OK ||
+        sqlite3_bind_int(stmt, 6, port) != SQLITE_OK) {
 
-	LOG_ERROR("set_pin_pubkey: bind: %s (#%d)",
+	LOG_ERROR("set_pubkey: bind: %s (#%d)",
                   sqlite3_errmsg(db), sqlite3_errcode(db));
     } else {
 	switch (sqlite3_step(stmt)) {
@@ -786,7 +782,7 @@ PATROL_set_pin_pubkey (const char *host, const char *proto, uint16_t port,
         case SQLITE_BUSY:
             // TODO retry
 	default:
-	    LOG_ERROR("set_pin_pubkey: step: %s (#%d)",
+	    LOG_ERROR("set_pubkey: step: %s (#%d)",
 		      sqlite3_errmsg(db), sqlite3_errcode(db));
 	}
     }

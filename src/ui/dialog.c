@@ -19,11 +19,13 @@ static PatrolID cert_id;
 static gchar *cert_id_str = NULL;
 static gchar *host = NULL, *proto = NULL, *app_name = NULL, **args = NULL;
 static guint16 port = 0;
-static gint chain_result = PATROL_ARG_UNKNOWN, chain_status = 0;
-static gint dane_result = PATROL_ARG_UNKNOWN, dane_status = 0;
-static PatrolCmdRC exit_status = PATROL_CMD_CONTINUE;
-static gboolean new = false, change = false, reject = false, edit = false;
+static PatrolVerifyRC result = PATROL_ARG_UNKNOWN;
+static gint chain_result = PATROL_ARG_UNKNOWN;
+static gint dane_result = PATROL_ARG_UNKNOWN;
+static gboolean notify = false;
+static PatrolCmdRC exit_status = PATROL_CMD_NONE;
 static PatrolPinMode pin_mode = PATROL_PIN_EXCLUSIVE;
+static PatrolConfig cfg;
 
 static gboolean
 print_version_and_exit (const gchar *option_name, const gchar *value,
@@ -79,16 +81,11 @@ load_chain (GcrParser *parser, PatrolRecord *rec, PatrolDialogRecord **drec)
     LOG_DEBUG(">> load_chain");
     size_t i;
     PatrolDialogRecord *r = g_malloc(sizeof(PatrolDialogRecord));
-    PATROL_set_id(r->id, rec->id);
-    r->status = rec->status;
-    r->der_chain = rec->chain;
-    r->der_chain_len = rec->chain_len;
-    r->first_seen = rec->first_seen;
-    r->last_seen = rec->last_seen;
-    r->count_seen = rec->count_seen;
-    r->pin_expiry = rec->pin_expiry;
+    r->rec = *rec;
     r->pin_changed = false;
-    r->pin_level = PATROL_get_pin_level(rec->chain, rec->chain_len, rec->pin_pubkey);
+    r->pin_level = PATROL_get_pin_level(rec->chain, rec->chain_len, rec->pubkey);
+    if (r->pin_level < 0)
+        r->pin_level = cfg.pin_level;
 
     *drec = r;
     r->chain = gcr_certificate_chain_new();
@@ -180,33 +177,21 @@ load_certs_error:
 static void
 store_changed_pins (GList *chains)
 {
-    PatrolDialogRecord *rec;
+    PatrolDialogRecord *r;
     GList *item = chains;
     guint i;
     for (i = 0; item && item->data; item = item->next, i++) {
-        rec = item->data;
-        if (rec->pin_changed)
-            PATROL_set_pin_from_chain(host, proto, port,
-                                      rec->id, rec->pin_level,
-                                      rec->der_chain, rec->der_chain_len);
+        r = item->data;
+        if (r->pin_changed)
+            PATROL_set_pubkey_from_chain(host, proto, port,
+                                         r->rec.id, r->pin_level,
+                                         r->rec.chain, r->rec.chain_len);
     }
 }
 
 const GOptionEntry options[] = {
     { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK,
       print_version_and_exit, N_("Show the application's version"), NULL },
-
-    { "new", 'n', 0, G_OPTION_ARG_NONE, &new,
-      N_("New certificate"), NULL },
-
-    { "change", 'x', 0, G_OPTION_ARG_NONE, &change,
-      N_("Changed certificate"), NULL },
-
-    { "reject", 'x', 0, G_OPTION_ARG_NONE, &reject,
-      N_("Rejected certificate"), NULL },
-
-    { "edit", 'e', 0, G_OPTION_ARG_NONE, &edit,
-      N_("Edit certificate"), NULL },
 
     { "host", 'H', 0, G_OPTION_ARG_STRING, &host,
       N_("Hostname of peer"), NULL },
@@ -220,20 +205,20 @@ const GOptionEntry options[] = {
     { "id", 'i', 0, G_OPTION_ARG_STRING, &cert_id_str,
       N_("ID of new certificate"), NULL },
 
-    { "chain-result", 'c', 0, G_OPTION_ARG_INT, &chain_result,
-      N_("Chain validation result"), NULL },
+    { "result", 'r', 0, G_OPTION_ARG_INT, &result,
+      N_("Pin verification result"), NULL },
 
-    { "chain-status", 'C', 0, G_OPTION_ARG_INT, &chain_status,
-      N_("Chain validation status"), NULL },
+    { "chain-result", 'c', 0, G_OPTION_ARG_INT, &chain_result,
+      N_("Chain verification result"), NULL },
 
     { "dane-result", 'd', 0, G_OPTION_ARG_INT, &dane_result,
-      N_("DANE validation result"), NULL },
-
-    { "dane-status", 'D', 0, G_OPTION_ARG_INT, &dane_status,
-      N_("DANE validation status"), NULL },
+      N_("DANE verification result"), NULL },
 
     { "app-name", 'a', 0, G_OPTION_ARG_STRING, &app_name,
       N_("Application name - defaults to parent process cmdline"), NULL },
+
+    { "notify", 'n', 0, G_OPTION_ARG_NONE, &notify,
+      N_("Launched from notification"), NULL },
 
     { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_STRING_ARRAY, &args,
       NULL, NULL },
@@ -280,6 +265,7 @@ main (int argc, char *argv[])
     }
 
     PATROL_init();
+    PATROL_get_config(&cfg);
     PATROL_set_id_str(cert_id, cert_id_str);
 
     if (!app_name) {
@@ -325,15 +311,9 @@ main (int argc, char *argv[])
     if (!chains)
         exit(-1);
 
-    PatrolEvent event
-        = new ? PATROL_EVENT_NEW
-        : change ? PATROL_EVENT_CHANGE
-        : reject ? PATROL_EVENT_REJECT
-        : PATROL_EVENT_NONE;
-
     PatrolDialogWindow *win
-        = patrol_dialog_window_new(host, proto, port, chains, chain_result,
-                                   dane_result, dane_status, app_name, event);
+        = patrol_dialog_window_new(host, proto, port, chains, result,
+                                   chain_result, dane_result, app_name, notify);
     gtk_widget_show(GTK_WIDGET(win));
 
     g_signal_connect(win, "response", G_CALLBACK(on_window_response), chains);
@@ -346,11 +326,14 @@ main (int argc, char *argv[])
     switch (exit_status) {
     case PATROL_CMD_ACCEPT:
         PATROL_set_cert_active(host, proto, port, cert_id, pin_mode);
-    case PATROL_CMD_CONTINUE:
         break;
     case PATROL_CMD_REJECT:
         PATROL_set_cert_status(host, proto, port, cert_id,
                                PATROL_STATUS_REJECTED);
+        break;
+    case PATROL_CMD_CONTINUE:
+    case PATROL_CMD_NONE:
+        break;
     }
 
     PATROL_deinit();

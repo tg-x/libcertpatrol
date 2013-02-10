@@ -282,6 +282,12 @@ PATROL_get_config (PatrolConfig *c)
         g_variant_unref(val);
     }
 
+    if ((val = read_cfg_val("update-seen", G_VARIANT_TYPE_BOOLEAN))) {
+        if (g_variant_get_boolean(val))
+            c->flags |= PATROL_CONFIG_UPDATE_SEEN;
+        g_variant_unref(val);
+    }
+
     if ((val = read_cfg_val("check-dane", G_VARIANT_TYPE_BOOLEAN))) {
         if (g_variant_get_boolean(val))
             c->check_flags |= PATROL_CHECK_DANE;
@@ -312,14 +318,18 @@ PATROL_set_config (PatrolConfig *c)
     set_cfg_val(ch, "notify-cmd", g_variant_new_string(c->notify_cmd));
     set_cfg_val(ch, "dialog-cmd", g_variant_new_string(c->dialog_cmd));
     set_cfg_val(ch, "pin-level", g_variant_new_int32(c->pin_level));
+    set_cfg_val(ch, "update-seen",
+                g_variant_new_boolean(c->flags & PATROL_CONFIG_UPDATE_SEEN));
     set_cfg_val(ch, "check-dane",
                 g_variant_new_boolean(c->check_flags & PATROL_CHECK_DANE));
     set_cfg_val(ch, "dane-ignore-local-resolver",
                 g_variant_new_boolean(c->dane_flags & DANE_F_IGNORE_LOCAL_RESOLVER));
 
     PatrolRC ret = PATROL_OK;
-    if (!dconf_client_change_fast(db, ch, NULL))
+    if (!dconf_client_change_fast(db, ch, NULL)) {
+        LOG_ERROR("set_config: error saving data");
         ret = PATROL_ERROR;
+    }
 
     dconf_changeset_unref(ch);
     return ret;
@@ -370,6 +380,13 @@ PATROL_get_cert (const char *host, const char *proto, uint16_t port,
     }
 
     val = read_val_type(host, proto, port, id,
+                        "chain_type", G_VARIANT_TYPE_UINT32);
+    if (val) {
+        rec->chain_type = g_variant_get_uint32(val);
+        g_variant_unref(val);
+    }
+
+    val = read_val_type(host, proto, port, id,
                         "chain", G_VARIANT_TYPE_ARRAY);
     if (val) {
         rec->chain_len = g_variant_n_children(val);
@@ -387,19 +404,12 @@ PATROL_get_cert (const char *host, const char *proto, uint16_t port,
         g_variant_unref(val);
     }
 
-    val = read_val(host, proto, port, id, "pin_pubkey");
+    val = read_val(host, proto, port, id, "pubkey");
     if (val) {
-        rec->pin_pubkey.size = g_variant_get_size(val);
-        rec->pin_pubkey.data = malloc(rec->pin_pubkey.size);
-        memcpy(rec->pin_pubkey.data, g_variant_get_data(val),
-               rec->pin_pubkey.size);
-        g_variant_unref(val);
-    }
-
-    val = read_val_type(host, proto, port, id,
-                        "pin_expiry", G_VARIANT_TYPE_INT64);
-    if (val) {
-        rec->pin_expiry = g_variant_get_int64(val);
+        rec->pubkey.size = g_variant_get_size(val);
+        rec->pubkey.data = malloc(rec->pubkey.size);
+        memcpy(rec->pubkey.data, g_variant_get_data(val),
+               rec->pubkey.size);
         g_variant_unref(val);
     }
 
@@ -501,12 +511,13 @@ PatrolRC
 PATROL_add_cert (const char *host, const char *proto,
                  uint16_t port, PatrolStatus status,
                  const PatrolData *chain, size_t chain_len,
-                 const unsigned char *pin_pubkey, size_t pin_pubkey_len,
-                 int64_t pin_expiry, PatrolID *id)
+                 PatrolCertType chain_type,
+                 const unsigned char *pubkey, size_t pubkey_len,
+                 PatrolID *id)
 {
-    LOG_DEBUG(">> add_cert: " PEER_FMT ", %d, %zu, %zu, %" PRId64,
+    LOG_DEBUG(">> add_cert: " PEER_FMT ", %d, %zu, %d, %zu",
               host, proto, port, status,
-              chain_len, pin_pubkey_len, pin_expiry);
+              chain_len, chain_type, pubkey_len);
     ASSERT_DB;
     if (!chain_len)
         return PATROL_ERROR;
@@ -533,12 +544,9 @@ PATROL_add_cert (const char *host, const char *proto,
         set_val(ch, host, proto, port, *id, "count_seen",
                 g_variant_new_uint64(1));
 
-        set_val(ch, host, proto, port, *id, "pin_expiry",
-                g_variant_new_int64(pin_expiry));
-
-        set_val(ch, host, proto, port, *id, "pin_pubkey",
+        set_val(ch, host, proto, port, *id, "pubkey",
                 g_variant_new_from_data(G_VARIANT_TYPE_BYTESTRING,
-                                        pin_pubkey, pin_pubkey_len,
+                                        pubkey, pubkey_len,
                                         TRUE, NULL, NULL));
 
         GVariant **items = g_new0(GVariant *, chain_len);
@@ -550,9 +558,14 @@ PATROL_add_cert (const char *host, const char *proto,
                 g_variant_new_array(NULL, items, chain_len));
         g_free(items);
 
+        set_val(ch, host, proto, port, *id, "chain_type",
+                g_variant_new_uint32(chain_type));
+
         PatrolRC ret = PATROL_OK;
-        if (!dconf_client_change_fast(db, ch, NULL))
+        if (!dconf_client_change_fast(db, ch, NULL)) {
+            LOG_ERROR("add_cert: error saving data");
             ret = PATROL_ERROR;
+        }
 
         dconf_changeset_unref(ch);
         return ret;
@@ -664,8 +677,10 @@ PATROL_set_cert_active (const char *host, const char *proto, uint16_t port,
         }
     }
 
-    if (!dconf_client_change_fast(db, ch, NULL))
+    if (!dconf_client_change_fast(db, ch, NULL)) {
+        LOG_ERROR("set_config: error saving data");
         ret = PATROL_ERROR;
+    }
 
     dconf_changeset_unref(ch);
     return ret;
@@ -703,24 +718,24 @@ PATROL_set_cert_seen (const char *host, const char *proto, uint16_t port,
     set_val(ch, host, proto, port, id, "last_seen",
             g_variant_new_int64(time(NULL)));
 
-    if (!dconf_client_change_fast(db, ch, NULL))
+    if (!dconf_client_change_fast(db, ch, NULL)) {
+        LOG_ERROR("set_cert_seen: error saving data");
         ret = PATROL_ERROR;
+    }
 
     dconf_changeset_unref(ch);
     return ret;
 }
 
 PatrolRC
-PATROL_set_pin_pubkey (const char *host, const char *proto,uint16_t port,
-                       PatrolID id, const unsigned char *pin_pubkey,
-                       size_t pin_pubkey_len, int64_t pin_expiry)
+PATROL_set_pubkey (const char *host, const char *proto,uint16_t port,
+                   PatrolID id, const unsigned char *pubkey, size_t pubkey_len)
 {
 #if DEBUG
     char id_str[PATROL_ID_STR_SIZE];
     get_id_str(id, id_str);
-    LOG_DEBUG(">> set_pin_pubkey: " CERT_FMT ", %zu, %" PRId64,
-              host, proto, port, id_str,
-              pin_pubkey_len, pin_expiry);
+    LOG_DEBUG(">> set_pubkey: " CERT_FMT ", %zu",
+              host, proto, port, id_str, pubkey_len);
 #endif
     ASSERT_DB;
 
@@ -730,17 +745,15 @@ PATROL_set_pin_pubkey (const char *host, const char *proto,uint16_t port,
 
     DConfChangeset *ch = dconf_changeset_new();
 
-    set_val(ch, host, proto, port, id, "pin_pubkey",
+    set_val(ch, host, proto, port, id, "pubkey",
             g_variant_new_from_data(G_VARIANT_TYPE_BYTESTRING,
-                                    pin_pubkey, pin_pubkey_len,
+                                    pubkey, pubkey_len,
                                     TRUE, NULL, NULL));
 
-    set_val(ch, host, proto, port, id, "pin_expiry",
-            g_variant_new_int64(pin_expiry));
-
-
-    if (!dconf_client_change_fast(db, ch, NULL))
+    if (!dconf_client_change_fast(db, ch, NULL)) {
+        LOG_ERROR("set_pubkey: error saving data");
         ret = PATROL_ERROR;
+    }
 
     dconf_changeset_unref(ch);
     return ret;

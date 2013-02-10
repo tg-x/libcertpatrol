@@ -20,7 +20,7 @@ struct _PatrolDialogWindowPrivate {
     const gchar *proto;
     gint16 port;
     GList *chains;
-    PatrolEvent event;
+    PatrolVerifyRC result;
 
     gboolean add_pin;
     gboolean all_hostnames;
@@ -219,7 +219,7 @@ patrol_dialog_window_constructed (GObject *obj)
     /* reject button */
     btn = gtk_button_new_from_stock(GTK_STOCK_NO);
     gtk_button_set_label(GTK_BUTTON(btn), _("_Reject"));
-    gtk_widget_set_tooltip_text(btn, _("Reject certificate.\nCauses verification failure."));
+    gtk_widget_set_tooltip_text(btn, _("Reject public key.\nCauses verification failure."));
     gtk_box_pack_start(GTK_BOX(bbox), btn, FALSE, TRUE, 0);
     g_signal_connect_object (GTK_BUTTON(btn), "clicked",
                              G_CALLBACK(on_reject_clicked), self, 0);
@@ -282,7 +282,7 @@ on_tree_view_focus (GtkTreeView *tree_view, GtkDirectionType dir, gpointer arg)
 static void
 on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg)
 {
-    PatrolDialogRecord *rec;
+    PatrolDialogRecord *r;
     GtkTreeModel *tree_model = GTK_TREE_MODEL(arg);
     GtkTreeIter iter, current, child;
     gboolean enabled, valid = TRUE;
@@ -301,14 +301,14 @@ on_radio_toggled (GtkCellRendererToggle *renderer, gchar *path_str, gpointer arg
         /* toggle this radio button to on */
         gtk_tree_store_set(GTK_TREE_STORE(tree_model), &iter, COL_PIN, TRUE, -1);
 
-        gtk_tree_model_get(tree_model, &iter, COL_REC, &rec, -1);
-        gtk_tree_model_get(tree_model, &iter, COL_PIN_LEVEL, &rec->pin_level, -1);
-        rec->pin_changed = TRUE;
+        gtk_tree_model_get(tree_model, &iter, COL_REC, &r, -1);
+        gtk_tree_model_get(tree_model, &iter, COL_PIN_LEVEL, &r->pin_level, -1);
+        r->pin_changed = TRUE;
     }
 }
 
 static void
-load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
+load_chain (PatrolDialogWindow *self, PatrolDialogRecord *r,
             guint idx, GtkWidget *container)
 {
     /* build tree model */
@@ -317,19 +317,19 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
                                                   G_TYPE_POINTER, G_TYPE_POINTER);
 
     GtkTreeIter *parent = NULL, iter;
-    gint i, num_certs = gcr_certificate_chain_get_length(rec->chain);
+    gint i, num_certs = gcr_certificate_chain_get_length(r->chain);
 
     for (i = num_certs - 1; i >= 0; i--) {
-        GcrCertificate *cert = gcr_certificate_chain_get_certificate(rec->chain, i);
+        GcrCertificate *cert = gcr_certificate_chain_get_certificate(r->chain, i);
         gchar *label = gcr_certificate_get_subject_name(cert);
 
         gtk_tree_store_append(tree_store, &iter, parent);
         gtk_tree_store_set(tree_store, &iter,
                            COL_NAME, label,
-                           COL_PIN, i == rec->pin_level,
+                           COL_PIN, i == r->pin_level,
                            COL_PIN_LEVEL, i,
                            COL_CERT, cert,
-                           COL_REC, rec,
+                           COL_REC, r,
                            -1);
         parent = &iter;
         g_free(label);
@@ -343,12 +343,12 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     GtkWidget *value;
 
     if (idx == 0) {
-        switch (self->pv->event) {
-        case  PATROL_EVENT_NEW:
-        case  PATROL_EVENT_CHANGE:
+        switch (self->pv->result) {
+        case  PATROL_VERIFY_NEW:
+        case  PATROL_VERIFY_CHANGE:
             text = g_strdup_printf("<b>%s</b>", _("New Certificate"));
             break;
-        case  PATROL_EVENT_REJECT:
+        case  PATROL_VERIFY_REJECT:
             text = g_strdup_printf("<b>%s</b>", _("Rejected Certificate"));
             break;
         default:
@@ -371,10 +371,10 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
 
     label = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label), _("Seen: "));
-    str = g_strdup_printf("%" G_GINT64_FORMAT, rec->count_seen);
+    str = g_strdup_printf("%" G_GINT64_FORMAT, r->rec.count_seen);
     text = g_strdup_printf(g_dngettext(textdomain(NULL),
                                        "%s time", "%s times",
-                                       rec->count_seen), str);
+                                       r->rec.count_seen), str);
     g_free(str);
     value = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(value), text);
@@ -386,7 +386,7 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
 
     label = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(label), _("First seen: "));
-    GDateTime *dtime = g_date_time_new_from_unix_local(rec->first_seen);
+    GDateTime *dtime = g_date_time_new_from_unix_local(r->rec.first_seen);
     text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
     g_date_time_unref(dtime);
     value = gtk_label_new(NULL);
@@ -397,10 +397,10 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
     gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 1, 1, 1);
     gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 1, 1, 1);
 
-    if (rec->first_seen != rec->last_seen) {
+    if (r->rec.first_seen != r->rec.last_seen) {
         label = gtk_label_new(NULL);
         gtk_label_set_markup(GTK_LABEL(label), _("Last seen: "));
-        dtime = g_date_time_new_from_unix_local(rec->last_seen);
+        dtime = g_date_time_new_from_unix_local(r->rec.last_seen);
         text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
         g_date_time_unref(dtime);
         value = gtk_label_new(NULL);
@@ -410,21 +410,6 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
         gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
         gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 2, 1, 1);
         gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 2, 1, 1);
-    }
-
-    if (rec->pin_expiry) {
-        label = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(label), _("Pin expiry: "));
-        dtime = g_date_time_new_from_unix_local(rec->last_seen);
-        text = g_date_time_format(dtime, "%Y-%m-%d %H:%M:%S");
-        g_date_time_unref(dtime);
-        value = gtk_label_new(NULL);
-        gtk_label_set_markup(GTK_LABEL(value), text);
-        g_free(text);
-        gtk_widget_set_halign(GTK_WIDGET(label), GTK_ALIGN_START);
-        gtk_widget_set_halign(GTK_WIDGET(value), GTK_ALIGN_START);
-        gtk_grid_attach(GTK_GRID(subtitle_grid), label, 0, 3, 1, 1);
-        gtk_grid_attach(GTK_GRID(subtitle_grid), value, 1, 3, 1, 1);
     }
 
     gtk_widget_show_all(title_box);
@@ -473,18 +458,20 @@ load_chain (PatrolDialogWindow *self, PatrolDialogRecord *rec,
 void
 patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                            const gchar *proto, guint16 port, GList *chains,
-                           gint chain_result, gint dane_result,
-                           gint dane_status, gchar *app_name, PatrolEvent event)
+                           PatrolVerifyRC result, gint chain_result,
+                           gint dane_result, gchar *app_name, gboolean notify)
 {
     PatrolDialogWindowPrivate *pv = self->pv;
     pv->host = host;
     pv->proto = proto;
     pv->port = port;
     pv->chains = chains;
-    pv->event = event;
+    pv->result = result;
 
     if (!chains)
         return;
+
+    PatrolDialogRecord *r = chains->data;
 
     /* window title */
     gchar *text = g_strdup_printf("%s - %s:%u (%s)", _("Certificate Patrol"),
@@ -500,12 +487,15 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
                              GTK_ICON_SIZE_DIALOG);
 
     text = g_strdup_printf(
-        (event == PATROL_EVENT_NONE)
+        (result == PATROL_ARG_UNKNOWN)
         ? _("Pinned public keys for peer <b>%s:%u (%s)</b>")
-        : (((PatrolDialogRecord *)(chains->data))->status == PATROL_STATUS_REJECTED)
+        : (r->rec.status == PATROL_STATUS_REJECTED)
         ? _("Rejected public key encountered for peer <b>%s:%u (%s)</b>")
         : (g_list_length(chains) > 1)
-        ? _("<b>Public key change</b> encountered for peer <b>%s:%u (%s)</b>\n"
+        ? _("<b>Changed public key</b> encountered for peer <b>%s:%u (%s)</b>\n"
+            "in application <b>%s</b>")
+        : notify
+        ? _("<b>New public key</b> accepted for peer <b>%s:%u (%s)</b>\n"
             "in application <b>%s</b>")
         : _("<b>New public key</b> encountered for peer <b>%s:%u (%s)</b>\n"
             "in application <b>%s</b>"),
@@ -537,20 +527,22 @@ patrol_dialog_window_load (PatrolDialogWindow *self, const gchar *host,
         gtk_image_set_from_stock(GTK_IMAGE(pv->dane_icon),
                                  (dane_result == DANE_E_SUCCESS)
                                  ? GTK_STOCK_APPLY
-                                 : (dane_result == DANE_E_NO_DANE_DATA)
+                                 : (dane_result == DANE_E_NO_DANE_DATA
+                                    || (dane_result > 0 &&
+                                        dane_result & DANE_VERIFY_NO_DANE_INFO))
                                  ? GTK_STOCK_DIALOG_INFO
-                                 : (dane_status == 0)
+                                 : (dane_result < 0)
                                  ? GTK_STOCK_DIALOG_WARNING
                                  : GTK_STOCK_DIALOG_ERROR,
                                  GTK_ICON_SIZE_BUTTON);
 
         gnutls_datum_t dane_status_str = { 0 };
-        if (dane_result >= 0 || dane_status != 0)
-            dane_verification_status_print(dane_status, &dane_status_str, 0);
+        if (dane_result >= 0)
+            dane_verification_status_print(dane_result, &dane_status_str, 0);
         text = g_strdup_printf(
             "<b>%s</b>: %s %.*s",
             _("DANE validation"),
-            dane_strerror(dane_result),
+            dane_strerror(dane_result < 0 ? dane_result : 0),
             dane_status_str.size, dane_status_str.data);
         gnutls_free(dane_status_str.data);
 
@@ -577,7 +569,7 @@ patrol_dialog_window_init (PatrolDialogWindow *self)
     pv->proto = NULL;
     pv->port = 0;
     pv->chains = NULL;
-    pv->event = PATROL_EVENT_NONE;
+    pv->result = PATROL_VERIFY_OK;
 
     pv->add_pin = FALSE;
     pv->all_hostnames = FALSE;
@@ -603,12 +595,12 @@ patrol_dialog_window_class_init (PatrolDialogWindowClass *cls)
 
 PatrolDialogWindow *
 patrol_dialog_window_new (const gchar *host, const gchar *proto,
-                          guint16 port, GList *chains,
-                          gint chain_result, gint dane_result,
-                          gint dane_status, gchar *app_name, PatrolEvent event)
+                          guint16 port, GList *chains, PatrolVerifyRC result,
+                          gint chain_result, gint dane_result, gchar *app_name,
+                          gboolean notify)
 {
     PatrolDialogWindow *self = g_object_new(PATROL_TYPE_DIALOG_WINDOW, NULL);
-    patrol_dialog_window_load(self, host, proto, port, chains, chain_result,
-                              dane_result, dane_status, app_name, event);
+    patrol_dialog_window_load(self, host, proto, port, chains, result,
+                              chain_result, dane_result, app_name, notify);
     return self;
 }

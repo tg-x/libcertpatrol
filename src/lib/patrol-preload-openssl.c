@@ -55,9 +55,9 @@ SSL_get_verify_result (const SSL *ssl)
     size_t chain_len
         = PATROL_OPENSSL_convert_chain(SSL_get_peer_cert_chain(ssl), &chain);
 
-    PatrolRC pret = PATROL_check(&cfg, chain, chain_len,
+    PatrolRC pret = PATROL_check(&cfg, chain, chain_len, PATROL_CERT_X509,
                                  ret == X509_V_OK ? PATROL_OK : PATROL_ERROR,
-                                 PATROL_CERT_X509, hostname, addr, protoname, port);
+                                 hostname, addr, protoname, port);
     LOG_DEBUG(">>> patrol result = %d", pret);
 
     PATROL_OPENSSL_free_chain(chain, chain_len);

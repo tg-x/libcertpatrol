@@ -4,21 +4,6 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/x509.h>
 
-static inline
-PatrolRC
-PATROL_GNUTLS_verify (const gnutls_datum_t *chain, size_t chain_len,
-                      PatrolCertType chain_type,
-                      PatrolRC chain_result, //unsigned int chain_status,
-                      const char *host, size_t host_len,
-                      const char *addr, size_t addr_len,
-                      const char *proto, size_t proto_len,
-                      uint16_t port)
-{
-    return PATROL_GNUTLS_verify((PatrolData *) chain, chain_len, chain_type,
-                                chain_result, host, host_len, addr, addr_len,
-                                proto, proto_len, port);
-}
-
 #if GNUTLS_CHECK_VERSION(3,0,0)
 
 PatrolRC

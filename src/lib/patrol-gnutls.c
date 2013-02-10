@@ -2,6 +2,8 @@
 #include "patrol.h"
 #include "patrol-gnutls.h"
 
+#if GNUTLS_CHECK_VERSION(3,0,0)
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -113,8 +115,6 @@ PATROL_GNUTLS_free_completed_chain (gnutls_datum_t *new_chain, size_t new_len,
         gnutls_free(new_chain);
     }
 }
-
-#if GNUTLS_CHECK_VERSION(3,0,0)
 
 PatrolRC
 PATROL_GNUTLS_complete_chain_from_trust_list (const gnutls_datum_t *chain, size_t chain_len,

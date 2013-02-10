@@ -80,21 +80,24 @@ gnutls_certificate_verify_peers3 (gnutls_session_t session,
 
     unsigned int pchain_len = 0;
     const gnutls_datum_t *pchain = gnutls_certificate_get_peers(session, &pchain_len);
-    size_t chain_len = 0;
-    gnutls_datum_t *chain;
+    size_t chain_len = pchain_len;
+    gnutls_datum_t *chain = (gnutls_datum_t *) pchain;
 
     gnutls_certificate_type_t chain_type = gnutls_certificate_type_get(session);
-    gnutls_certificate_credentials_t cred
-        = (gnutls_certificate_credentials_t)
-        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
 
     PATROL_init();
     if (!cfg.loaded)
         PATROL_get_config(&cfg);
 
+#if GNUTLS_CHECK_VERSION(3,0,0)
+    gnutls_certificate_credentials_t cred
+        = (gnutls_certificate_credentials_t)
+        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
+
     PATROL_GNUTLS_complete_chain_from_credentials(pchain, pchain_len,
                                                   chain_type, cred,
                                                   &chain, &chain_len);
+#endif
 
     int pret
         = PATROL_check(&cfg, chain, chain_len, chain_type,
@@ -163,21 +166,24 @@ gnutls_certificate_verify_peers2 (gnutls_session_t session,
 
     unsigned int pchain_len = 0;
     const gnutls_datum_t *pchain = gnutls_certificate_get_peers(session, &pchain_len);
-    size_t chain_len = 0;
-    gnutls_datum_t *chain;
+    size_t chain_len = pchain_len;
+    gnutls_datum_t *chain = (gnutls_datum_t *) pchain;
 
     gnutls_certificate_type_t chain_type = gnutls_certificate_type_get(session);
-    gnutls_certificate_credentials_t cred
-        = (gnutls_certificate_credentials_t)
-        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
 
     PATROL_init();
     if (!cfg.loaded)
         PATROL_get_config(&cfg);
 
+#if GNUTLS_CHECK_VERSION(3,0,0)
+    gnutls_certificate_credentials_t cred
+        = (gnutls_certificate_credentials_t)
+        _gnutls_get_cred(session, GNUTLS_CRD_CERTIFICATE, NULL);
+
     PATROL_GNUTLS_complete_chain_from_credentials(pchain, pchain_len,
                                                   chain_type, cred,
                                                   &chain, &chain_len);
+#endif
 
     int pret
         = PATROL_check(&cfg, chain, chain_len, chain_type,

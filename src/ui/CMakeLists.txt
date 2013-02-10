@@ -6,6 +6,7 @@ add_dependencies(certpatrol-dialog certpatrol)
 
 set(LIBS
     certpatrol
+    ${GNUTLS_LIBRARIES}
     ${GTK_LIBRARIES}
     ${GCR_LIBRARIES}
 )

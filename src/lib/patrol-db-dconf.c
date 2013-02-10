@@ -294,11 +294,13 @@ PATROL_get_config (PatrolConfig *c)
         g_variant_unref(val);
     }
 
+#ifdef HAVE_GNUTLS_DANE
     if ((val = read_cfg_val("dane-ignore-local-resolver", G_VARIANT_TYPE_BOOLEAN))) {
         if (g_variant_get_boolean(val))
             c->dane_flags |= DANE_F_IGNORE_LOCAL_RESOLVER;
         g_variant_unref(val);
     }
+#endif
 
     c->loaded = time(NULL);
     return PATROL_OK;
@@ -322,8 +324,10 @@ PATROL_set_config (PatrolConfig *c)
                 g_variant_new_boolean(c->flags & PATROL_CONFIG_UPDATE_SEEN));
     set_cfg_val(ch, "check-dane",
                 g_variant_new_boolean(c->check_flags & PATROL_CHECK_DANE));
+#ifdef HAVE_GNUTLS_DANE
     set_cfg_val(ch, "dane-ignore-local-resolver",
                 g_variant_new_boolean(c->dane_flags & DANE_F_IGNORE_LOCAL_RESOLVER));
+#endif
 
     PatrolRC ret = PATROL_OK;
     if (!dconf_client_change_fast(db, ch, NULL)) {

@@ -13,8 +13,6 @@
 # include <gnutls/dane.h>
 #endif
 
-static dane_state_t dane_state = NULL;
-
 PatrolRC
 PATROL_init ()
 {
@@ -47,6 +45,8 @@ PATROL_check (const PatrolConfig *cfg,
     int dane_result = 0;
     unsigned int dane_status = 0;
 #ifdef HAVE_GNUTLS_DANE
+    static dane_state_t dane_state = NULL;
+
     if (cfg->check_flags & PATROL_CHECK_DANE) {
         if (!dane_state)
             dane_state_init(&dane_state, cfg->dane_flags);
@@ -79,8 +79,11 @@ PATROL_check (const PatrolConfig *cfg,
     PatrolAction action = PATROL_ACTION_NONE;
 
     if (chain_result != PATROL_OK
+#ifdef HAVE_GNUTLS_DANE
         || dane_status & DANE_VERIFY_CERT_DIFFERS
-        || dane_status & DANE_VERIFY_CA_CONSTRAINS_VIOLATED) {
+        || dane_status & DANE_VERIFY_CA_CONSTRAINS_VIOLATED
+#endif
+        ) {
 
         ret = PATROL_ERROR;
         action = PATROL_ACTION_DIALOG;

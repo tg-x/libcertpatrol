@@ -17,7 +17,7 @@
 # include <gnutls/dane.h>
 #endif
 
-#define DIR "/system/tls/certpatrol/"
+#define DIR "/system/tls/tofu/"
 
 #define CFG_DIR DIR "config/"
 #define CFG_KEY CFG_DIR "%s"

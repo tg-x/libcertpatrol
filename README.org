@@ -1,0 +1,51 @@
+#+TITLE: Certificate Patrol
+
+* Introduction
+
+=libcertpatrol= implements public key pinning for TLS using a trust on first use
+(TOFU) model.
+
+It is intended as a fallback mechanism when there's no pinning protocol in use
+by the server, such as DANE or TACK.
+
+TODO: more details.
+
+* Installation
+
+** Prerequisites
+
+The following libraries are required:
+
+- GnuTLS
+- dconf
+- uuid
+- OpenSSL (optional)
+- NSS (optional)
+- gcr-3
+
+** Compiling
+
+Run cmake to use the default options:
+: cmake .
+
+Or use ccmake for a text-based configuration:
+: ccmake .
+
+Or use cmake-gui for GUI configuration:
+: cmake-gui .
+
+Add the following option for a debug build:
+: cmake -DCMAKE_BUILD_TYPE=Debug .
+
+Compile and install:
+: make
+: sudo make install
+
+* Usage
+
+API documentation is available after
+: make doc
+
+For testing purposes a bin/certpatrol script is also provided that uses
+LD_PRELOAD to override certificate verification functionality of TLS libraries:
+: certpatrol curl -i https://en.wikipedia.org

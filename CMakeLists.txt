@@ -18,7 +18,7 @@ set(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -ggdb -O2" CACHE STRING
     "C flags for release with debug info" FORCE)
 set(CMAKE_C_FLAGS_RELEASE "-O2" CACHE STRING
     "C flags for release" FORCE)
-set(DB_BACKEND "auto" CACHE STRING
+set(DB_BACKEND "dconf" CACHE STRING
     "Database backend: auto / dconf / sqlite")
 
 include(FindPkgConfig)

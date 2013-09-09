@@ -31,10 +31,16 @@ typedef enum {
     PATROL_PIN_ISSUER = 1,
 } PatrolPinLevel;
 
+/// Record status
 typedef enum {
+    /// Inactive: skipped during verification.
     PATROL_STATUS_INACTIVE = 1 << 0,
+    /// Active: any of the active records are accepted as valid.
     PATROL_STATUS_ACTIVE   = 1 << 1,
-    PATROL_STATUS_REJECTED = 1 << 2,
+    /// Critical: a critical record must match for the validation to pass.
+    PATROL_STATUS_CRITICAL = 1 << 2,
+    /// Rejected: if a rejected record is matched, the validation fails.
+    PATROL_STATUS_REJECTED = 1 << 3,
     PATROL_STATUS_ANY = 0xff,
 } PatrolStatus;
 
@@ -144,6 +150,8 @@ typedef struct PatrolRecord PatrolRecord;
 struct PatrolRecord {
     /// Certificate status.
     PatrolStatus status;
+    /// Critical record: must match for the validation to pass.
+    bool critical;
     /// Timestamp when the certificate was first seen for this peer.
     int64_t first_seen;
     /// Timestamp when the certificate was last seen for this peer.

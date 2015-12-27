@@ -8,7 +8,16 @@
 It is intended as a fallback mechanism when there's no pinning protocol in use
 by the server, such as DANE or TACK.
 
-TODO: more details.
+It is described in more detail in https://gnunet.org/tofu-pinning
+
+* Authors
+
+- Gabor X Toth
+- Tjebbe Vlieg
+
+* License
+
+TBD
 
 * Installation
 

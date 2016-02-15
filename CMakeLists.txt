@@ -27,9 +27,18 @@ pkg_check_modules(PKG_GNUTLS gnutls REQUIRED)
 pkg_check_modules(PKG_GNUTLS_DANE gnutls-dane)
 pkg_check_modules(PKG_OPENSSL openssl)
 pkg_check_modules(PKG_NSS nss)
+pkg_check_modules(PKG_NSPR nspr)
 
-pkg_check_modules(PKG_GTK gtk+-3.0 REQUIRED)
 pkg_check_modules(PKG_GCR gcr-3 REQUIRED)
+pkg_check_modules(PKG_P11_KIT p11-kit-1 REQUIRED)
+
+pkg_check_modules(PKG_GLIB glib-2.0 REQUIRED)
+pkg_check_modules(PKG_ATK atk REQUIRED)
+pkg_check_modules(PKG_GTK gtk+-3.0 REQUIRED)
+pkg_check_modules(PKG_GDK_PIXBUF gdk-pixbuf-2.0 REQUIRED)
+pkg_check_modules(PKG_CAIRO cairo REQUIRED)
+pkg_check_modules(PKG_PANGO pango REQUIRED)
+pkg_check_modules(PKG_PANGOCAIRO pangocairo REQUIRED)
 
 pkg_check_modules(PKG_DCONF dconf)
 pkg_check_modules(PKG_UUID uuid)
@@ -93,12 +102,12 @@ set(NSS_LIBDIR ${PKG_NSS_LIBDIR} CACHE STRING
 set(NSS_LIBRARIES ${PKG_NSS_LIBRARIES} CACHE STRING
     "NSS libraries")
 
-set(GTK_INCLUDE_DIRS ${PKG_GTK_INCLUDE_DIRS} CACHE STRING
-    "GTK include dirs")
-set(GTK_LIBDIR ${PKG_GTK_LIBDIR} CACHE STRING
-    "GTK lib dir")
-set(GTK_LIBRARIES ${PKG_GTK_LIBRARIES} CACHE STRING
-    "GTK libraries")
+set(NSPR_INCLUDE_DIRS ${PKG_NSPR_INCLUDE_DIRS} CACHE STRING
+    "NSPR include dirs")
+set(NSPR_LIBDIR ${PKG_NSPR_LIBDIR} CACHE STRING
+    "NSPR lib dir")
+set(NSPR_LIBRARIES ${PKG_NSPR_LIBRARIES} CACHE STRING
+    "NSPR libraries")
 
 set(GCR_INCLUDE_DIRS ${PKG_GCR_INCLUDE_DIRS} CACHE STRING
     "Gcr include dirs")
@@ -106,6 +115,62 @@ set(GCR_LIBDIR ${PKG_GCR_LIBDIR} CACHE STRING
     "Gcr lib dir")
 set(GCR_LIBRARIES ${PKG_GCR_LIBRARIES} CACHE STRING
     "Gcr libraries")
+
+set(P11_KIT_INCLUDE_DIRS ${PKG_P11_KIT_INCLUDE_DIRS} CACHE STRING
+    "p11-kit include dirs")
+set(P11_KIT_LIBDIR ${PKG_P11_KIT_LIBDIR} CACHE STRING
+    "p11-kit lib dir")
+set(P11_KIT_LIBRARIES ${PKG_P11_KIT_LIBRARIES} CACHE STRING
+    "p11-kit libraries")
+
+set(GLIB_INCLUDE_DIRS ${PKG_GLIB_INCLUDE_DIRS} CACHE STRING
+    "glib include dirs")
+set(GLIB_LIBDIR ${PKG_GLIB_LIBDIR} CACHE STRING
+    "glib lib dir")
+set(GLIB_LIBRARIES ${PKG_GLIB_LIBRARIES} CACHE STRING
+    "glib libraries")
+
+set(ATK_INCLUDE_DIRS ${PKG_ATK_INCLUDE_DIRS} CACHE STRING
+    "ATK include dirs")
+set(ATK_LIBDIR ${PKG_ATK_LIBDIR} CACHE STRING
+    "ATK lib dir")
+set(ATK_LIBRARIES ${PKG_ATK_LIBRARIES} CACHE STRING
+    "ATK libraries")
+
+set(GTK_INCLUDE_DIRS ${PKG_GTK_INCLUDE_DIRS} CACHE STRING
+    "GTK include dirs")
+set(GTK_LIBDIR ${PKG_GTK_LIBDIR} CACHE STRING
+    "GTK lib dir")
+set(GTK_LIBRARIES ${PKG_GTK_LIBRARIES} CACHE STRING
+    "GTK libraries")
+
+set(GDK_PIXBUF_INCLUDE_DIRS ${PKG_GTK_INCLUDE_DIRS} CACHE STRING
+    "GDK-Pixbuf include dirs")
+set(GDK_PIXBUF_LIBDIR ${PKG_GDK_PIXBUF_LIBDIR} CACHE STRING
+    "GDK-Pixbuf lib dir")
+set(GDK_PIXBUF_LIBRARIES ${PKG_GDK_PIXBUF_LIBRARIES} CACHE STRING
+    "GDK-Pixbuf libraries")
+
+set(CAIRO_INCLUDE_DIRS ${PKG_CAIRO_INCLUDE_DIRS} CACHE STRING
+    "Cairo include dirs")
+set(CAIRO_LIBDIR ${PKG_CAIRO_LIBDIR} CACHE STRING
+    "Cairo lib dir")
+set(CAIRO_LIBRARIES ${PKG_CAIRO_LIBRARIES} CACHE STRING
+    "Cairo libraries")
+
+set(PANGO_INCLUDE_DIRS ${PKG_PANGO_INCLUDE_DIRS} CACHE STRING
+    "Pango include dirs")
+set(PANGO_LIBDIR ${PKG_PANGO_LIBDIR} CACHE STRING
+    "Pango lib dir")
+set(PANGO_LIBRARIES ${PKG_PANGO_LIBRARIES} CACHE STRING
+    "Pango libraries")
+
+set(PANGOCAIRO_INCLUDE_DIRS ${PKG_PANGOCAIRO_INCLUDE_DIRS} CACHE STRING
+    "Pango Cairo include dirs")
+set(PANGOCAIRO_LIBDIR ${PKG_PANGOCAIRO_LIBDIR} CACHE STRING
+    "Pango Cairo lib dir")
+set(PANGOCAIRO_LIBRARIES ${PKG_PANGOCAIRO_LIBRARIES} CACHE STRING
+    "Pango Cairo libraries")
 
 if (DB_BACKEND STREQUAL "auto")
   if (DCONF_LIBRARIES AND UUID_LIBRARIES)
@@ -153,6 +218,7 @@ include_directories(
     ${GNUTLS_DANE_INCLUDE_DIRS}
     ${OPENSSL_INCLUDE_DIRS}
     ${NSS_INCLUDE_DIRS}
+    ${NSPR_INCLUDE_DIRS}
 
     ${DCONF_INCLUDE_DIRS}
     ${UUID_INCLUDE_DIRS}
@@ -160,8 +226,16 @@ include_directories(
     ${SQLITE_INCLUDE_DIRS}
     ${LIBTASN1_INCLUDE_DIRS}
 
-    ${GTK_INCLUDE_DIRS}
     ${GCR_INCLUDE_DIRS}
+    ${P11_KIT_INCLUDE_DIRS}
+
+    ${GLIB_INCLUDE_DIRS}
+    ${ATK_INCLUDE_DIRS}
+    ${GTK_INCLUDE_DIRS}
+    ${GDK_PIXBUF_INCLUDE_DIRS}
+    ${CAIRO_INCLUDE_DIRS}
+    ${PANGO_INCLUDE_DIRS}
+    ${PANGOCAIRO_INCLUDE_DIRS}
 )
 link_directories(
     ${CMAKE_SOURCE_DIR}/lib
@@ -170,6 +244,7 @@ link_directories(
     ${GNUTLS_DANE_LIBDIR}
     ${OPENSSL_LIBDIR}
     ${NSS_LIBDIR}
+    ${NSPR_LIBDIR}
 
     ${DCONF_LIBDIR}
     ${UUID_LIBDIR}
@@ -177,14 +252,24 @@ link_directories(
     ${SQLITE_LIBDIR}
     ${LIBASN1_LIBDIR}
 
-    ${GTK_LIBDIR}
     ${GCR_LIBDIR}
+    ${P11_KIT_LIBDIR}
+
+    ${GLIB_LIBDIR}
+    ${ATK_LIBDIR}
+    ${GTK_LIBDIR}
+    ${GDK_PIXBUF_LIBDIR}
+    ${CAIRO_LIBDIR}
+    ${PANGO_LIBDIR}
+    ${PANGOCAIRO_LIBDIR}
 )
 
 set(HAVE_GNUTLS ${GNUTLS_LIBRARIES})
 set(HAVE_GNUTLS_DANE ${GNUTLS_DANE_LIBRARIES})
 set(HAVE_OPENSSL ${OPENSSL_LIBRARIES})
-set(HAVE_NSS ${NSS_LIBRARIES})
+if (NSS_LIBRARIES AND NSPR_LIBRARIES)
+  set(HAVE_NSS 1)
+endif ()
 
 include(CheckIncludeFile)
 

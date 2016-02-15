@@ -4,9 +4,10 @@
 #include "patrol-preload.h"
 
 #include <nss.h>
-#include <nss/cert.h>
-#include <nspr/prio.h>
-#include <nspr/prnetdb.h>
+#include <cert.h>
+
+#include <prio.h>
+#include <prnetdb.h>
 
 #define LIBNSS3 "libnss3.so"
 #define LIBSSL3 "libssl3.so"
@@ -36,7 +37,7 @@ SSL_SetURL(PRFileDesc *fd, char *url)
   * with a specified hostname.
   */
 SECStatus
-CERT_VerifyCertName(CERTCertificate *cert, const char *hostname)
+CERT_VerifyCertName(const CERTCertificate *cert, const char *hostname)
 {
     LOG_DEBUG(">> CERT_VerifyCertName: %s", hostname);
     static SECStatus (*VerifyCertName)(CERTCertificate *cert,

@@ -353,3 +353,5 @@ foreach(p ${paths})
     endif()
     install(FILES ${f} DESTINATION ${d})
 endforeach()
+
+INSTALL(PROGRAMS bin/certpatrol bin/certpatrol-notify DESTINATION bin)

@@ -250,7 +250,7 @@ link_directories(
     ${UUID_LIBDIR}
 
     ${SQLITE_LIBDIR}
-    ${LIBASN1_LIBDIR}
+    ${LIBTASN1_LIBDIR}
 
     ${GCR_LIBDIR}
     ${P11_KIT_LIBDIR}
